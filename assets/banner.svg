@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="300" viewBox="0 0 1200 300" role="img" aria-label="AgentPay — Autonomous AI service router">
+  <rect width="1200" height="300" fill="#121212"/>
+  <circle cx="1060" cy="50" r="190" fill="#CEFF45" opacity="0.05"/>
+  <circle cx="140" cy="270" r="150" fill="#CEFF45" opacity="0.04"/>
+  <circle cx="600" cy="150" r="260" fill="#CEFF45" opacity="0.02"/>
+  <text x="600" y="138" text-anchor="middle" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="76" font-weight="700" fill="#FFFFFF" letter-spacing="-1.5">Agent<tspan fill="#CEFF45">Pay</tspan></text>
+  <text x="600" y="176" text-anchor="middle" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="19" font-weight="400" fill="#9CA3AF" letter-spacing="5">AUTONOMOUS AI SERVICE ROUTER</text>
+  <g font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="15" font-weight="600">
+    <rect x="162" y="214" width="140" height="40" rx="20" fill="#5298FF"/>
+    <text x="232" y="239" text-anchor="middle" fill="#FFFFFF">ENSv2</text>
+    <rect x="346" y="214" width="140" height="40" rx="20" fill="#6747ED"/>
+    <text x="416" y="239" text-anchor="middle" fill="#FFFFFF">The Graph</text>
+    <rect x="530" y="214" width="140" height="40" rx="20" fill="#CEFF45"/>
+    <text x="600" y="239" text-anchor="middle" fill="#121212">AI decides</text>
+    <rect x="714" y="214" width="140" height="40" rx="20" fill="#00C28B"/>
+    <text x="784" y="239" text-anchor="middle" fill="#FFFFFF">Hedera</text>
+    <rect x="898" y="214" width="140" height="40" rx="20" fill="#FFFFFF"/>
+    <text x="968" y="239" text-anchor="middle" fill="#121212">x402</text>
+  </g>
+  <g stroke="#5B5B5B" stroke-width="2" fill="none">
+    <line x1="302" y1="234" x2="338" y2="234"/>
+    <line x1="486" y1="234" x2="522" y2="234"/>
+    <line x1="670" y1="234" x2="706" y2="234"/>
+    <line x1="854" y1="234" x2="890" y2="234"/>
+  </g>
+  <g fill="#5B5B5B">
+    <polygon points="338,234 330,229 330,239"/>
+    <polygon points="522,234 514,229 514,239"/>
+    <polygon points="706,234 698,229 698,239"/>
+    <polygon points="890,234 882,229 882,239"/>
+  </g>
+</svg>
