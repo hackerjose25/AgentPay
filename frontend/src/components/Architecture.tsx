@@ -1,251 +1,488 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
-const layers = [
+interface PipelineStage {
+  id: string;
+  stepNum: string;
+  name: string;
+  sub: string;
+  icon: React.ReactNode;
+  status: string;
+  statusType: 'ready' | 'active' | 'success';
+  headline: string;
+  description: string;
+  specs: { label: string; value: string }[];
+  payload: string;
+  fileLabel: string;
+  badge: string;
+}
+
+const pipelineStages: PipelineStage[] = [
   {
-    num: 'LAYER 01',
-    title: 'Frontend & Client SDK',
-    desc: 'Autonomous agent runtime, service marketplace browser, non-custodial Hedera wallet management, and real-time transaction ledger.',
-    tag: 'Next.js 16 · Turbopack',
-    bgType: 'hero' as const,
+    id: 'discover',
+    stepNum: '01',
+    name: 'DISCOVER',
+    sub: 'ENSv2 Registry',
+    badge: 'ENSv2 · Machine Directory',
     icon: (
-      <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2">
-        <rect x="2" y="3" width="20" height="14" rx="2" />
-        <line x1="8" y1="21" x2="16" y2="21" />
-        <line x1="12" y1="17" x2="12" y2="21" />
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2">
+        <circle cx="12" cy="12" r="10" />
+        <line x1="2" y1="12" x2="22" y2="12" />
+        <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
       </svg>
     ),
+    status: 'ENS RESOLVED',
+    statusType: 'success',
+    headline: 'Machine-Readable Service Discovery',
+    description:
+      'The agent queries ENSv2 for candidates providing required capabilities without central gatekeepers or hardcoded provider endpoints.',
+    specs: [
+      { label: 'Query', value: 'ocr.*.eth' },
+      { label: 'Network', value: 'ENSv2 (Hedera Native)' },
+      { label: 'Candidates Found', value: '3 Verified Services' },
+      { label: 'Endpoint Protocol', value: 'x402-v1 / HTTPS' },
+    ],
+    fileLabel: 'ens_discovery_lookup.json',
+    payload: `// 1. ENSv2 machine discovery query
+QUERY ens_records("ocr.*.eth", { capability: "invoice_ocr" })
+
+--> RESOLVED CANDIDATES:
+[
+  {
+    "domain": "ocr.alpha.eth",
+    "endpoint": "https://alpha.example/ocr",
+    "price": "0.010 HBAR",
+    "hederaAccount": "0.0.4829103"
   },
   {
-    num: 'LAYER 02',
-    title: 'Backend & Payment Coordinator',
-    desc: 'Registry cache, REST routing engine, x402 challenge interceptor, and Blocky402 verification facilitator bridge.',
-    tag: 'Node.js · REST Router',
-    bgType: 'coordinator' as const,
-    icon: (
-      <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2">
-        <rect x="2" y="2" width="20" height="8" rx="2" />
-        <rect x="2" y="14" width="20" height="8" rx="2" />
-        <line x1="6" y1="6" x2="6.01" y2="6" strokeWidth="3" />
-        <line x1="6" y1="18" x2="6.01" y2="18" strokeWidth="3" />
-      </svg>
-    ),
+    "domain": "ocr.beta.eth",
+    "endpoint": "https://beta.example/ocr",
+    "price": "0.007 HBAR",
+    "hederaAccount": "0.0.3920194"
   },
   {
-    num: 'LAYER 03',
-    title: 'Hedera Settlement Layer',
-    desc: 'Sub-second finality aBFT consensus, native HBAR micro-transfers (HTS), and ServiceRegistry.sol EVM smart contract.',
-    tag: 'Chain ID 296 · ~1s Finality',
-    bgType: 'hedera' as const,
-    icon: (
-      <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2">
-        <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
-      </svg>
-    ),
+    "domain": "ocr.gamma.eth",
+    "endpoint": "https://gamma.example/ocr",
+    "price": "0.012 HBAR",
+    "hederaAccount": "0.0.5102941"
+  }
+]`,
   },
   {
-    num: 'LAYER 04',
-    title: 'x402 AI Inference Endpoints',
-    desc: 'Pay-per-inference gateways protecting DeepSeek, Llama 3, Claude, OpenAI, and local Ollama workers with zero human subscription accounts.',
-    tag: 'HTTP 402 Gated · Pay-Per-Call',
-    bgType: 'x402' as const,
+    id: 'evaluate',
+    stepNum: '02',
+    name: 'EVALUATE',
+    sub: 'The Graph Telemetry',
+    badge: 'The Graph · Decentralized Indexing',
     icon: (
-      <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2">
-        <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
-        <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
-        <line x1="12" y1="22.08" x2="12" y2="12" />
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2">
+        <line x1="18" y1="20" x2="18" y2="10" />
+        <line x1="12" y1="20" x2="12" y2="4" />
+        <line x1="6" y1="20" x2="6" y2="14" />
       </svg>
     ),
+    status: 'INDEX TELEMETRY ACQUIRED',
+    statusType: 'success',
+    headline: 'Historical Evidence & Reputation',
+    description:
+      'The Graph returns verifiable on-chain performance signals: request volumes, failure rates, uptime latency, and past settlement proofs.',
+    specs: [
+      { label: 'Subgraph', value: 'agentpay-hedera-telemetry' },
+      { label: 'Index Coverage', value: '11,400+ Total Requests' },
+      { label: 'Top Provider Rate', value: '98.7% Success (alpha)' },
+      { label: 'Query Latency', value: '142ms' },
+    ],
+    fileLabel: 'graph_reputation_telemetry.graphql',
+    payload: `// 2. The Graph queries indexed reputation & latency
+QUERY SubgraphTelemetry($domains: ["ocr.alpha.eth", "ocr.beta.eth", "ocr.gamma.eth"]) {
+  providers(where: { domain_in: $domains }) {
+    domain
+    completedRequests
+    successRate
+    medianLatencyMs
+    reputationScore
+  }
+}
+
+--> TELEMETRY VERDICT:
+ocr.alpha.eth: 2,431 tasks · 98.7% success · 420ms · score: 0.96 (OPTIMAL)
+ocr.beta.eth:     48 tasks · 91.6% success · 890ms · score: 0.74 (LOW SAMPLE)
+ocr.gamma.eth: 8,921 tasks · 97.2% success · 380ms · score: 0.94 (EXPENSIVE)`,
+  },
+  {
+    id: 'decide',
+    stepNum: '03',
+    name: 'DECIDE',
+    sub: 'AI Policy Engine',
+    badge: 'LLM Scoring · Policy Bounds',
+    icon: (
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2">
+        <path d="M12 2a4 4 0 0 1 4 4c0 1.1-.45 2.1-1.17 2.83L16 10h-8l1.17-1.17A4 4 0 0 1 12 2z" />
+        <path d="M4 22h16l-2-6H6l-2 6z" />
+      </svg>
+    ),
+    status: 'ROUTE DECISION LOCKED',
+    statusType: 'success',
+    headline: 'Multi-Factor Policy Route Selection',
+    description:
+      'Decision engine evaluates candidates against policy budget, SLA bounds, and composite scoring metrics to lock in the optimal route.',
+    specs: [
+      { label: 'Winner Selected', value: 'ocr.alpha.eth' },
+      { label: 'Composite Score', value: '0.932 / 1.000' },
+      { label: 'Budget Cap', value: '0.050 HBAR max' },
+      { label: 'Route Rationale', value: 'Reliability/Cost optimum' },
+    ],
+    fileLabel: 'agent_routing_verdict.json',
+    payload: `// 3. AI Policy Engine scores candidates against constraints
+{
+  "task": "invoice_ocr",
+  "policyBounds": {
+    "maxBudget": "0.050 HBAR",
+    "minReliability": 0.95,
+    "maxLatencyMs": 1000
+  },
+  "decisionFactors": {
+    "reliabilityWeight": 0.35,
+    "capabilityMatch": 0.30,
+    "reputationHistory": 0.20,
+    "costEfficiency": 0.15
+  },
+  "selectedProvider": "ocr.alpha.eth",
+  "compositeScore": 0.932,
+  "alternativesConsidered": ["ocr.beta.eth", "ocr.gamma.eth"],
+  "decisionStatus": "ROUTE_CONFIRMED"
+}`,
+  },
+  {
+    id: 'settle',
+    stepNum: '04',
+    name: 'SETTLE',
+    sub: 'Hedera + x402',
+    badge: 'HTTP 402 · HBAR Settlement',
+    icon: (
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2">
+        <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
+      </svg>
+    ),
+    status: 'CONSENSUS FINALIZED',
+    statusType: 'success',
+    headline: 'Machine-to-Machine Instant Micro-Settlement',
+    description:
+      'The service returns HTTP 402. The autonomous agent immediately executes an on-chain HBAR transfer on Hedera with sub-second finality.',
+    specs: [
+      { label: 'Protocol Gate', value: 'HTTP 402 Payment Required' },
+      { label: 'Settlement Asset', value: '0.010 HBAR ($0.0006)' },
+      { label: 'Consensus Latency', value: '840ms Finality' },
+      { label: 'Hedera Network', value: 'Hedera Testnet' },
+    ],
+    fileLabel: 'hedera_consensus_receipt.http',
+    payload: `// 4. x402 challenge issued & paid on Hedera
+--> POST https://alpha.example/ocr
+<-- HTTP/1.1 402 Payment Required
+    X-402-PayTo: 0.0.4829103
+    X-402-Amount: 0.010 HBAR
+    X-402-Nonce: 7f83b165-4f29
+
+--> HEDERA TRANSACT:
+    Payer: 0.0.9482104 (Agent) → Receiver: 0.0.4829103
+    Amount: 1,000,000 tinybars (0.010 HBAR)
+
+<-- HEDERA CONSENSUS CONFIRMATION:
+    Status: SUCCESS (200 OK)
+    TxID: 0.0.9482104@1718293812.000000000
+    Receipt: https://hashscan.io/testnet/transaction/0.0.9482104@1718293812`,
+  },
+  {
+    id: 'unlock',
+    stepNum: '05',
+    name: 'UNLOCK',
+    sub: 'Protected Execution',
+    badge: 'Execution · Zero Human Loop',
+    icon: (
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2">
+        <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+        <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+      </svg>
+    ),
+    status: 'SERVICE DELIVERED',
+    statusType: 'success',
+    headline: 'Cryptographic Proof & Execution Result',
+    description:
+      'Blocky402 validator validates the Hedera consensus receipt. The endpoint unlocks instantly and delivers high-fidelity AI output.',
+    specs: [
+      { label: 'Response Code', value: '200 OK' },
+      { label: 'Validator', value: 'Blocky402 Consensus Gate' },
+      { label: 'Execution Time', value: '312ms' },
+      { label: 'Human Steps', value: '0 (Autonomous)' },
+    ],
+    fileLabel: 'ai_service_result.json',
+    payload: `// 5. Proof verified → Service execution completed
+--> POST https://alpha.example/ocr
+    Authorization: Bearer x402-0.0.9482104@1718293812
+
+<-- HTTP/1.1 200 OK
+    Content-Type: application/json
+    X-x402-Verified-By: Blocky402-Hedera-Validator
+
+{
+  "status": "completed",
+  "task": "invoice_ocr",
+  "result": {
+    "vendor": "Acme Services LLC",
+    "invoiceNumber": "INV-2026-894",
+    "total": 450.00,
+    "currency": "USD",
+    "confidence": 0.994
+  },
+  "computeTimeMs": 312,
+  "gasSettled": "0.010 HBAR"
+}`,
   },
 ];
 
-const mockPayloads = {
-  request: `// 1. Agent calls endpoint without key
-POST /v1/chat/completions HTTP/1.1
-Host: api.provider.ai
-Content-Type: application/json
-
-{ "model": "deepseek-r1", "prompt": "Analyze contract" }`,
-  challenge: `// 2. Gateway intercepts with HTTP 402
-HTTP/1.1 402 Payment Required
-X-402-Version: 1.0
-X-402-PayTo: 0.0.4829103
-X-402-Amount: 0.05
-X-402-Currency: HBAR
-X-402-Nonce: 0x8f2d4e19b`,
-  settlement: `// 3. Hedera settles & service unlocks
-HBAR Transfer: 0.05 HBAR -> 0.0.4829103
-Transaction ID: 0.0.18293@1718293812.000000000
-Consensus: SUCCESS (Latency: 840ms)
-Receipt: https://hashscan.io/testnet/tx/...`,
-};
-
 export default function Architecture() {
-  const [activeTab, setActiveTab] = useState<'request' | 'challenge' | 'settlement'>('challenge');
+  const [activeStepIndex, setActiveStepIndex] = useState<number>(0);
+  const [isSimulating, setIsSimulating] = useState<boolean>(false);
+  const [copied, setCopied] = useState<boolean>(false);
+  const simulationTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const currentStage = pipelineStages[activeStepIndex];
+
+  // Auto-play simulation loop
+  useEffect(() => {
+    if (isSimulating) {
+      simulationTimerRef.current = setInterval(() => {
+        setActiveStepIndex((prev) => (prev + 1) % pipelineStages.length);
+      }, 2600);
+    } else {
+      if (simulationTimerRef.current) {
+        clearInterval(simulationTimerRef.current);
+      }
+    }
+    return () => {
+      if (simulationTimerRef.current) clearInterval(simulationTimerRef.current);
+    };
+  }, [isSimulating]);
+
+  const handleCopy = () => {
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(currentStage.payload);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
 
   return (
     <section className="arch-section" id="architecture">
       <div className="inner">
-        <div className="section-title">
+        {/* Section Title */}
+        <div className="section-title arch-title-row">
           <div>
             <h2 data-scroll>
-              Three layers, <span>zero</span><br />
-              human intervention.
+              Autonomous routing,<br />
+              from discovery to <span>instant settlement</span>.
             </h2>
             <p>
-              Decoupled client, coordination middleware, and public ledger settlement. Each tier is modular and permissionless.
+              ENSv2 discovers. The Graph evaluates. AI scores. Hedera settles. x402 unlocks. Zero human intervention in the execution loop.
             </p>
+          </div>
+
+          <div className="pipeline-top-cta">
+            <button
+              className={`pipeline-sim-toggle ${isSimulating ? 'simulating' : ''}`}
+              onClick={() => setIsSimulating(!isSimulating)}
+              title="Simulate autonomous pipeline execution"
+            >
+              <span className="sim-pulse"></span>
+              <span>{isSimulating ? 'Pause Flow Simulation' : 'Run Pipeline Simulation'}</span>
+            </button>
           </div>
         </div>
 
-        <div className="arch-grid">
-          {/* Left Column: Featured Architecture Core Card */}
-          <div className="featured-card" data-scroll data-anim="fade-up">
-            <div className="featured-header">
-              <div className="status-pill">
-                <span className="pulsing-dot"></span>
-                <span>DATA FLOW PIPELINE</span>
+        {/* Master Pipeline Showcase Container */}
+        <div className="pipeline-showcase-card" data-scroll data-anim="fade-up">
+          {/* Card Header with Status & Architecture Badges */}
+          <div className="pipeline-card-header">
+            <div className="pipeline-status-badge">
+              <span className="pulsing-dot"></span>
+              <span>AUTONOMOUS PIPELINE RUNTIME</span>
+            </div>
+            <div className="pipeline-meta-tags">
+              <span className="pipeline-network-pill">HEDERA TESTNET</span>
+              <span className="pipeline-network-pill">ENSv2 NATIVE</span>
+              <span className="pipeline-network-pill">x402 STANDARD</span>
+            </div>
+          </div>
+
+          {/* 5-Stage Interactive Pipeline Stepper Track */}
+          <div className="pipeline-stepper-track">
+            {pipelineStages.map((stage, idx) => {
+              const isActive = idx === activeStepIndex;
+              const isPast = idx < activeStepIndex;
+              return (
+                <div key={stage.id} className="pipeline-step-wrapper">
+                  <button
+                    className={`pipeline-step-node ${isActive ? 'active' : ''} ${isPast ? 'completed' : ''}`}
+                    onClick={() => {
+                      setIsSimulating(false);
+                      setActiveStepIndex(idx);
+                    }}
+                    aria-label={`Step ${stage.stepNum}: ${stage.name}`}
+                  >
+                    <div className="step-node-header">
+                      <span className="step-node-index">{stage.stepNum}</span>
+                      <span className="step-node-indicator">
+                        {isActive && <span className="active-ping" />}
+                      </span>
+                    </div>
+
+                    <div className="step-node-icon">{stage.icon}</div>
+                    <div className="step-node-name">{stage.name}</div>
+                    <div className="step-node-sub">{stage.sub}</div>
+                  </button>
+
+                  {/* Connecting conduit arrow on desktop */}
+                  {idx < pipelineStages.length - 1 && (
+                    <div className={`pipeline-conduit ${idx < activeStepIndex ? 'conduit-active' : ''}`}>
+                      <div className="conduit-line">
+                        <div className="conduit-particle" />
+                      </div>
+                      <span className="conduit-arrow">&rarr;</span>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Dual-Pane Telemetry & Protocol Inspector */}
+          <div className="pipeline-workspace-grid">
+            {/* Left Column: Stage Deep Dive & Live Parameters */}
+            <div className="pipeline-telemetry-pane">
+              <div className="pane-header">
+                <div className="pane-step-badge">
+                  <span>STAGE {currentStage.stepNum} OF 05</span>
+                  <span className="pane-stage-tag">{currentStage.badge}</span>
+                </div>
+                <div className="pane-status-indicator">
+                  <span className="pulsing-dot" />
+                  <span>{currentStage.status}</span>
+                </div>
               </div>
-              <div className="chain-badge">HEDERA TESTNET · 296</div>
+
+              <div className="pane-body">
+                <h3 className="pane-headline">{currentStage.headline}</h3>
+                <p className="pane-description">{currentStage.description}</p>
+
+                {/* Technical Specs Key-Value Grid */}
+                <div className="pane-specs-grid">
+                  {currentStage.specs.map((spec, i) => (
+                    <div key={i} className="spec-item">
+                      <div className="spec-label">{spec.label}</div>
+                      <div className="spec-value">{spec.value}</div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Stage Navigation Stepper Controls */}
+                <div className="pane-nav-controls">
+                  <button
+                    className="pane-nav-btn prev"
+                    disabled={activeStepIndex === 0}
+                    onClick={() => {
+                      setIsSimulating(false);
+                      setActiveStepIndex((prev) => Math.max(0, prev - 1));
+                    }}
+                  >
+                    &larr; Prev Step
+                  </button>
+
+                  <div className="pane-nav-dots">
+                    {pipelineStages.map((_, i) => (
+                      <span
+                        key={i}
+                        className={`nav-dot ${i === activeStepIndex ? 'active' : ''}`}
+                        onClick={() => {
+                          setIsSimulating(false);
+                          setActiveStepIndex(i);
+                        }}
+                      />
+                    ))}
+                  </div>
+
+                  <button
+                    className="pane-nav-btn next"
+                    disabled={activeStepIndex === pipelineStages.length - 1}
+                    onClick={() => {
+                      setIsSimulating(false);
+                      setActiveStepIndex((prev) => Math.min(pipelineStages.length - 1, prev + 1));
+                    }}
+                  >
+                    Next Step &rarr;
+                  </button>
+                </div>
+              </div>
             </div>
 
-            {/* Interactive Data Flow Diagram */}
-            <div className="pipeline-schematic">
-              <div className="node agent">
-                <div className="node-icon">🤖</div>
-                <div className="node-label">Autonomous Agent</div>
-                <div className="node-sub">Hedera Wallet Signer</div>
-              </div>
-
-              <div className="flow-arrow forward">
-                <span className="arrow-line"></span>
-                <span className="flow-tag">1. HTTP POST</span>
-              </div>
-
-              <div className="node gateway">
-                <div className="node-icon">⚡</div>
-                <div className="node-label">x402 Gateway</div>
-                <div className="node-sub">Middleware Gate</div>
-              </div>
-
-              <div className="flow-arrow backward">
-                <span className="arrow-line"></span>
-                <span className="flow-tag challenge">2. HTTP 402</span>
-              </div>
-
-              <div className="node hedera">
-                <div className="node-icon">⛓️</div>
-                <div className="node-label">Hedera Network</div>
-                <div className="node-sub">Consensus Settlement</div>
-              </div>
-
-              <div className="flow-arrow forward">
-                <span className="arrow-line"></span>
-                <span className="flow-tag success">3. Unlock</span>
-              </div>
-
-              <div className="node provider">
-                <div className="node-icon">🧠</div>
-                <div className="node-label">AI Inference</div>
-                <div className="node-sub">LLM / Vision Model</div>
-              </div>
-            </div>
-
-            {/* Interactive Protocol Inspector */}
-            <div className="protocol-inspector">
-              <div className="inspector-tabs">
+            {/* Right Column: Protocol Terminal Inspector */}
+            <div className="pipeline-terminal-pane">
+              <div className="terminal-header">
+                <div className="terminal-window-dots">
+                  <span className="dot red" />
+                  <span className="dot yellow" />
+                  <span className="dot green" />
+                </div>
+                <div className="terminal-file-title">
+                  <span className="terminal-file-icon">&#9639;</span>
+                  <span>{currentStage.fileLabel}</span>
+                </div>
                 <button
-                  className={`tab-btn ${activeTab === 'request' ? 'active' : ''}`}
-                  onClick={() => setActiveTab('request')}
+                  className="terminal-copy-btn"
+                  onClick={handleCopy}
+                  title="Copy protocol payload"
                 >
-                  Request
-                </button>
-                <button
-                  className={`tab-btn ${activeTab === 'challenge' ? 'active' : ''}`}
-                  onClick={() => setActiveTab('challenge')}
-                >
-                  HTTP 402
-                </button>
-                <button
-                  className={`tab-btn ${activeTab === 'settlement' ? 'active' : ''}`}
-                  onClick={() => setActiveTab('settlement')}
-                >
-                  On-Chain Receipt
+                  {copied ? 'Copied ✓' : 'Copy Payload'}
                 </button>
               </div>
 
-              <div className="inspector-code">
-                <pre><code>{mockPayloads[activeTab]}</code></pre>
+              <div className="terminal-body">
+                <pre className="terminal-code">
+                  <code>{currentStage.payload}</code>
+                </pre>
               </div>
-            </div>
 
-            {/* Metrics Footer */}
-            <div className="featured-metrics">
-              <div className="metric">
-                <div className="val">&lt; 1.2s</div>
-                <div className="lbl">Finality</div>
-              </div>
-              <div className="metric">
-                <div className="val">&lt; $0.001</div>
-                <div className="lbl">Tx Cost</div>
-              </div>
-              <div className="metric">
-                <div className="val">aBFT</div>
-                <div className="lbl">Security</div>
+              <div className="terminal-footer">
+                <div className="terminal-foot-item">
+                  <span className="foot-label">Protocol:</span>
+                  <span className="foot-val">HTTP/1.1 402 / ENSv2 / Graph</span>
+                </div>
+                <div className="terminal-foot-item">
+                  <span className="foot-label">Status:</span>
+                  <span className="foot-val success">Consensus Verified</span>
+                </div>
               </div>
             </div>
           </div>
 
-          {/* Right Column: Layer Stack (RLY News/Grid modular style) */}
-          <div className="layers-stack">
-            {layers.map((l, i) => (
-              <div
-                key={i}
-                className="layer-item"
-                data-scroll
-                data-anim="fade-left"
-                data-anim-delay={i * 90}
-              >
-                {/* Background graphic for each layer */}
-                <div className="layer-bg">
-                  {l.bgType === 'hero' && <div className="layer-bg-hero" />}
-                  {l.bgType === 'coordinator' && (
-                    <div className="layer-bg-coordinator">
-                      <svg viewBox="0 0 220 160" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <circle cx="35" cy="80" r="18" stroke="currentColor" strokeWidth="2" />
-                        <circle cx="110" cy="35" r="14" stroke="currentColor" strokeWidth="1.5" />
-                        <circle cx="110" cy="125" r="14" stroke="currentColor" strokeWidth="1.5" />
-                        <circle cx="185" cy="80" r="20" stroke="currentColor" strokeWidth="2" strokeDasharray="5 3" />
-                        <path d="M53 80 L96 35 M53 80 L96 125 M124 35 L165 80 M124 125 L165 80" stroke="currentColor" strokeWidth="1.5" strokeDasharray="4 3" />
-                        <circle cx="35" cy="80" r="7" fill="currentColor" />
-                        <circle cx="110" cy="35" r="5" fill="currentColor" />
-                        <circle cx="110" cy="125" r="5" fill="currentColor" />
-                        <circle cx="185" cy="80" r="8" fill="currentColor" />
-                        <path d="M5 80 H17 M205 80 H218" stroke="currentColor" strokeWidth="2" />
-                      </svg>
-                    </div>
-                  )}
-                  {l.bgType === 'hedera' && <div className="layer-bg-hedera" />}
-                  {l.bgType === 'x402' && <div className="layer-bg-x402" />}
-                </div>
-
-                <div className="layer-top">
-                  <span className="layer-tag">{l.num}</span>
-                  <span className="layer-badge">{l.tag}</span>
-                </div>
-
-                <div className="layer-main">
-                  <div className="layer-icon-box">
-                    {l.icon}
-                  </div>
-                  <div className="layer-details">
-                    <h3 className="layer-title">{l.title}</h3>
-                    <p className="layer-desc">{l.desc}</p>
-                  </div>
-                </div>
-              </div>
-            ))}
+          {/* Bottom Metrics Bar */}
+          <div className="pipeline-metrics-bar">
+            <div className="pipeline-metric">
+              <div className="metric-val">&lt; 850ms</div>
+              <div className="metric-lbl">Average End-to-End Latency</div>
+            </div>
+            <div className="pipeline-metric">
+              <div className="metric-val">0.010 HBAR</div>
+              <div className="metric-lbl">Machine Micro-Settlement Unit</div>
+            </div>
+            <div className="pipeline-metric">
+              <div className="metric-val">0 Humans</div>
+              <div className="metric-lbl">In the Loop · Fully Autonomous</div>
+            </div>
+            <div className="pipeline-metric">
+              <div className="metric-val">100% On-Chain</div>
+              <div className="metric-lbl">Hedera Consensus Timestamped</div>
+            </div>
           </div>
         </div>
       </div>

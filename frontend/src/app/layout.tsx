@@ -4,8 +4,8 @@ import { WalletProvider } from "@/context/WalletContext";
 import WalletModal from "@/components/WalletModal";
 
 export const metadata: Metadata = {
-  title: "AgentPay — Autonomous AI Agent Marketplace",
-  description: "Autonomous AI agent marketplace with x402 pay-per-inference on Hedera.",
+  title: "AgentPay — Autonomous AI Service Router",
+  description: "Autonomous AI service router — discover the best service, prove why it was chosen, and pay for it autonomously. ENSv2 discovers, The Graph evaluates, AI decides, Hedera settles, x402 unlocks.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

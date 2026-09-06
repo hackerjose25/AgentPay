@@ -12,7 +12,7 @@ export default function Footer() {
           <span>x402 makes them independent.</span>
         </h2>
         <p>
-          Every payment is a public, verifiable receipt. Built for ETHOnline 2026 — Hedera AI &amp; Agentic Payments track.
+          ENS discovers. The Graph evaluates. AI decides. Hedera settles. x402 unlocks. Built for ETHOnline 2026 — Hedera AI &amp; Agentic Payments track.
         </p>
         <a
           className="btn solid mask-bt loop"

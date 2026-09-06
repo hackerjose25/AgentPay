@@ -34,13 +34,13 @@ export default function Hero() {
           </svg>
           <div className="infos">
             <div className="item" data-anim="fade-up" data-anim-delay="1100">
-              <div className="number">x402</div>
-              <div className="desc"><a href="#architecture">Payment Protocol &rarr;</a></div>
+              <div className="number">ENSv2</div>
+              <div className="desc"><a href="https://ens.domains" target="_blank" rel="noopener noreferrer">Identity &amp; Discovery &rarr;</a></div>
             </div>
             <div className="line" data-anim data-anim-delay="1350"></div>
             <div className="item" data-anim="fade-up" data-anim-delay="1200">
-              <div className="number">~1<sub>s</sub></div>
-              <div className="desc"><a href="https://hashscan.io/testnet" target="_blank" rel="noopener noreferrer">Hedera Finality &rarr;</a></div>
+              <div className="number">Graph</div>
+              <div className="desc"><a href="https://thegraph.com" target="_blank" rel="noopener noreferrer">Provider Intelligence &rarr;</a></div>
             </div>
           </div>
         </div>
@@ -49,7 +49,7 @@ export default function Hero() {
         <div className="title">
           <p data-anim data-anim-delay="700">ETHOnline 2026 &mdash; Hedera AI &amp; Agentic Payments</p>
           <h2 data-anim="fade" data-anim-duration="1000">
-            Agents that pay for<br />themselves, and<br /><span>prove it on-chain.</span>
+            Agents that discover,<br />evaluate, and<br /><span>pay for themselves.</span>
           </h2>
           <div className="buttons" data-anim="fade" data-anim-delay="800">
             <a className="btn default" href="#architecture">
@@ -68,13 +68,13 @@ export default function Hero() {
           </svg>
           <div className="infos">
             <div className="item" data-anim="fade-up" data-anim-delay="1100">
-              <div className="number">HBAR</div>
-              <div className="desc"><a href="https://portal.hedera.com/faucet" target="_blank" rel="noopener noreferrer">Native Settlement &rarr;</a></div>
+              <div className="number">Hedera</div>
+              <div className="desc"><a href="https://hedera.com" target="_blank" rel="noopener noreferrer">HBAR Settlement &rarr;</a></div>
             </div>
             <div className="line" data-anim data-anim-delay="1350"></div>
             <div className="item" data-anim="fade-up" data-anim-delay="1200">
-              <div className="number">&lt;$0.01</div>
-              <div className="desc"><a href="https://hashscan.io/testnet" target="_blank" rel="noopener noreferrer">Per Transaction &rarr;</a></div>
+              <div className="number">x402</div>
+              <div className="desc"><a href="https://x402.org" target="_blank" rel="noopener noreferrer">Machine Payments &rarr;</a></div>
             </div>
           </div>
         </div>
