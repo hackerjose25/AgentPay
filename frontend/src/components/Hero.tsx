@@ -47,16 +47,39 @@ export default function Hero() {
 
         {/* Center title */}
         <div className="title">
-          <p data-anim data-anim-delay="700">ETHOnline 2026 &mdash; Hedera AI &amp; Agentic Payments</p>
+          <p data-anim data-anim-delay="700">Autonomous AI service routing</p>
           <h2 data-anim="fade" data-anim-duration="1000">
             Agents that discover,<br />evaluate, and<br /><span>pay for themselves.</span>
           </h2>
           <div className="buttons" data-anim="fade" data-anim-delay="800">
+            <a className="btn default" href="#features">
+              <div className="container"><span>Explore Features</span></div>
+            </a>
+            <a className="btn solid mask-bt loop" href="/dashboard">
+              <div className="container"><span>Launch Console</span></div>
+            </a>
             <a className="btn default" href="#architecture">
               <div className="container"><span>Explore Architecture</span></div>
             </a>
-            <a className="btn solid" href="#features">
-              <div className="container"><span>Explore Features</span></div>
+          </div>
+
+          {/* Mobile protocol pills row */}
+          <div className="hero-mobile-protocols" data-anim="fade" data-anim-delay="1000">
+            <a href="https://ens.domains" target="_blank" rel="noopener noreferrer" className="hero-proto-pill">
+              <span className="proto-name">ENSv2 &rarr;</span>
+              <span className="proto-desc">Identity &amp; Discovery</span>
+            </a>
+            <a href="https://thegraph.com" target="_blank" rel="noopener noreferrer" className="hero-proto-pill">
+              <span className="proto-name">The Graph &rarr;</span>
+              <span className="proto-desc">Provider Intelligence</span>
+            </a>
+            <a href="https://hedera.com" target="_blank" rel="noopener noreferrer" className="hero-proto-pill">
+              <span className="proto-name">Hedera &rarr;</span>
+              <span className="proto-desc">HBAR Settlement</span>
+            </a>
+            <a href="https://x402.org" target="_blank" rel="noopener noreferrer" className="hero-proto-pill">
+              <span className="proto-name">x402 &rarr;</span>
+              <span className="proto-desc">Machine Payments</span>
             </a>
           </div>
         </div>

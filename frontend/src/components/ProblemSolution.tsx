@@ -48,7 +48,7 @@ export default function ProblemSolution() {
     const lastItemRect = lastItem.getBoundingClientRect();
     const lastItemCenter = lastItemRect.top + lastItemRect.height / 2;
 
-    const stickyTop = window.innerHeight * 0.11;
+    const stickyTop = isMobile ? window.innerHeight * 0.24 : window.innerHeight * 0.11;
     const stickyCenter = stickyTop + iconEl.offsetHeight / 2;
 
     if (lastItemCenter < stickyCenter) {
@@ -59,9 +59,28 @@ export default function ProblemSolution() {
     }
   }, []);
 
-  // --- Scroll-linked opacity + color for desktop list (RLY GSAP timeline) ---
+  // --- Scroll-linked opacity + color for desktop list and active state for mobile list ---
   const handleScroll = useCallback(() => {
     updateIconPosition();
+    const isMobile = window.innerWidth < 768;
+
+    if (isMobile) {
+      const mList = listMobileRef.current;
+      if (!mList) return;
+      const mItems = Array.from(mList.querySelectorAll('li'));
+      const vh = window.innerHeight;
+      mItems.forEach((item) => {
+        const rect = item.getBoundingClientRect();
+        const inFocus = rect.top < vh * 0.7 && rect.bottom > vh * 0.25;
+        if (inFocus) {
+          item.classList.add('active');
+        } else {
+          item.classList.remove('active');
+        }
+      });
+      return;
+    }
+
     const list = listWebRef.current;
     if (!list) return;
     const items = Array.from(list.querySelectorAll('li'));
@@ -96,7 +115,7 @@ export default function ProblemSolution() {
       (item as HTMLElement).style.opacity = String(opacity);
       (item as HTMLElement).style.color = color;
     });
-  }, []);
+  }, [updateIconPosition]);
 
   // --- Canvas sprite animation: draw frame based on scroll with buttery smooth lerp ---
   useEffect(() => {
@@ -150,8 +169,8 @@ export default function ProblemSolution() {
       const lastRect = lastItem.getBoundingClientRect();
       const lastCenter = lastRect.top + lastRect.height / 2;
 
-      const focalStart = window.innerHeight * 0.55;
-      const stickyTop = window.innerHeight * 0.11;
+      const focalStart = isMobile ? window.innerHeight * 0.5 : window.innerHeight * 0.55;
+      const stickyTop = isMobile ? window.innerHeight * 0.24 : window.innerHeight * 0.11;
       const iconEl = iconRef.current;
       const stickyCenter = stickyTop + (iconEl ? iconEl.offsetHeight / 2 : 0);
 

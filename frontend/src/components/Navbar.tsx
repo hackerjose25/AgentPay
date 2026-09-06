@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
+import Link from 'next/link';
 import { useWallet } from '@/context/WalletContext';
 
 export default function Navbar() {
@@ -20,6 +21,7 @@ export default function Navbar() {
 
   return (
     <nav className="navbar">
+      <div className="nav-inner">
       <a href="#" className="brand">
         <svg viewBox="0 0 48 48" fill="none">
           <path fillRule="evenodd" clipRule="evenodd" d="M23.8588 4.80005L40.8 14.4V33.8824L23.8588 43.2001L7.20001 33.8824V14.4L23.8588 4.80005ZM12.847 17.7883L23.8587 11.2942L34.8705 17.7883L29.7882 20.8942L23.8587 17.2236L18.494 20.8942V33.8825L12.847 30.4942V17.7883Z" fill="currentColor"/>
@@ -32,6 +34,10 @@ export default function Navbar() {
           <a href="https://github.com/hackerjose25/AgentPay.git" target="_blank" rel="noopener noreferrer">GitHub</a>
         </div>
 
+        <Link href="/dashboard" className="nav-console-btn">  
+          <span>Console</span>
+        </Link>
+
         {isConnected ? (
           <button className="nav-wallet-btn connected" onClick={openAccountModal}>
             <span className="wallet-dot"></span>
@@ -41,12 +47,14 @@ export default function Navbar() {
         ) : (
           <button className="nav-wallet-btn" onClick={openModal}>
             <span className="wallet-dot"></span>
-            <span>Connect Wallet</span>
+            <span className="wallet-text-full">Connect Wallet</span>
+            <span className="wallet-text-short">Connect</span>
           </button>
         )}
       </div>
 
       <button className="toggler" id="toggler"></button>
+      </div>
     </nav>
   );
 }

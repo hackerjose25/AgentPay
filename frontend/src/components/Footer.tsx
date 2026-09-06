@@ -12,7 +12,7 @@ export default function Footer() {
           <span>x402 makes them independent.</span>
         </h2>
         <p>
-          ENS discovers. The Graph evaluates. AI decides. Hedera settles. x402 unlocks. Built for ETHOnline 2026 — Hedera AI &amp; Agentic Payments track.
+          ENS discovers. The Graph evaluates. AI decides. Hedera settles. x402 unlocks.
         </p>
         <a
           className="btn solid mask-bt loop"
@@ -25,12 +25,12 @@ export default function Footer() {
       </div>
 
       <div className="end">
-        <div className="copy">AgentPay — ETHOnline 2026</div>
+        <div className="copy">AgentPay</div>
         <ul className="links">
+          <li><a href="/dashboard">Console</a></li>
           <li><a href="https://hashscan.io/testnet" target="_blank" rel="noopener noreferrer">HashScan</a></li>
           <li><a href="https://portal.hedera.com/faucet" target="_blank" rel="noopener noreferrer">Faucet</a></li>
           <li><a href="https://x402.org" target="_blank" rel="noopener noreferrer">x402</a></li>
-          <li><a href="https://ethglobal.com" target="_blank" rel="noopener noreferrer">ETHGlobal</a></li>
         </ul>
       </div>
     </footer>
