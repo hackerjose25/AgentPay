@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="300" viewBox="0 0 1200 300" role="img" aria-labelledby="title description">
+  <title id="title">AgentPay — Autonomous AI service router</title>
+  <desc id="description">ENSv2 identifies services, AI selects within budget, x402 requests payment, Blocky402 facilitates settlement, and Hedera settles HBAR.</desc>
+  <defs>
+    <clipPath id="bounds"><rect width="1200" height="300"/></clipPath>
+    <marker id="arrow" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0 0 L7 3.5 L0 7Z" fill="#555951"/></marker>
+  </defs>
+  <g clip-path="url(#bounds)">
+    <rect width="1200" height="300" fill="#111210"/>
+    <circle cx="140" cy="282" r="152" fill="#b0ff45" opacity=".045"/>
+    <circle cx="600" cy="150" r="260" fill="#b0ff45" opacity=".025"/>
+    <circle cx="1055" cy="55" r="185" fill="#b0ff45" opacity=".055"/>
+    <text x="600" y="136" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="74" font-weight="700" letter-spacing="-2"><tspan fill="#ffffff">Agent</tspan><tspan fill="#b0ff45">Pay</tspan></text>
+    <text x="600" y="177" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="20" letter-spacing="5" fill="#aab9cd">AUTONOMOUS AI SERVICE ROUTER</text>
+    <g stroke="#555951" stroke-width="2" marker-end="url(#arrow)">
+      <path d="M302 234 H337"/>
+      <path d="M486 234 H521"/>
+      <path d="M670 234 H705"/>
+      <path d="M854 234 H889"/>
+    </g>
+    <g font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="700" text-anchor="middle">
+      <rect x="162" y="214" width="140" height="40" rx="20" fill="#5577ff"/>
+      <text x="232" y="239" fill="#ffffff">ENSv2</text>
+      <rect x="346" y="214" width="140" height="40" rx="20" fill="#b0ff45"/>
+      <text x="416" y="239" fill="#111210">AI selects</text>
+      <rect x="530" y="214" width="140" height="40" rx="20" fill="#ffffff"/>
+      <text x="600" y="239" fill="#111210">x402</text>
+      <rect x="714" y="214" width="140" height="40" rx="20" fill="#ff526b"/>
+      <text x="784" y="239" fill="#ffffff">Blocky402</text>
+      <rect x="898" y="214" width="140" height="40" rx="20" fill="#00c990"/>
+      <text x="968" y="239" fill="#111210">Hedera</text>
+    </g>
+  </g>
+</svg>
