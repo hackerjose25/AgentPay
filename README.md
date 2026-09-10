@@ -29,7 +29,7 @@ AgentPay is an AI service router. Give the agent an invoice and a spending limit
 
 > 🌐 ENS identifies → 🧭 AgentPay selects → 💸 Blocky402 settles on Hedera → 📄 Service returns the result
 
-**Document status: build specification, September 9, 2026.** This workspace currently contains planning documents, not a runnable application. The architecture, API routes, environment variables, scripts, and examples below are the implementation contract to build. They are not claims of completed features. Update this status and replace illustrative values as milestones are verified.
+**Implementation status: Day 1 scaffold, September 10, 2026.** The Node 22 npm workspace, shared schemas/policy, Express and Next.js shells, PostgreSQL migration, synthetic fixture, ENS read/setup scripts, strict x402 proof route/client, and readiness commands now exist. Offline verification is recorded in `HISTORY.md`. Live ENS writes, database migration, account funding, and paid Hedera settlement remain unverified and must not be represented as complete until their authorized testnet evidence is recorded.
 
 **Scope decision:** target ENS and Hedera only. The Graph, subgraphs, cross-chain receipt contracts, and on-chain reputation scoring are deferred. Application history is stored in a database.
 
@@ -231,9 +231,8 @@ sequenceDiagram
     participant M as Extraction model
     A->>S: Request with request ID
     S-->>A: HTTP 402 + payment requirements
-    Note over A: Check amount, asset, network, recipient, expiry; reserve budget
-    A->>A: Build and partially sign payment payload
-    A->>S: Retry same request with SDK payment header
+    Note over A: Validate terms, build and sign payment payload, reserve budget
+    A->>S: Retry same request with signed payment payload
     S->>B: Verify payload against requirements
     B-->>S: Verification result
     S->>B: Settle verified payment
@@ -320,7 +319,7 @@ Keep fixture images only for the demo. Do not put invoice contents on-chain. Per
 
 No separate microservices are necessary initially. Host both provider routes in the same backend process, with separate provider configurations and recipients. Separate their directories in code so they can be deployed independently later. Use a durable database from the first real payment.
 
-Target layout; only `README.md` and `AGENTS.md` exist at the time of drafting:
+Implemented Day 1 layout (later-day modules and routes remain governed by the contracts below):
 
 ```text
 AgentPay/
@@ -410,7 +409,7 @@ This plan is not evidence of a deadline extension. If beginning Sep 9, its final
 
 ## 🚀 Setup and run instructions
 
-> **Not executable yet:** these commands describe the scripts the initial scaffolding must create. Run `npm run` after scaffolding to confirm that they exist. Do not interpret this section as a working installation guide until the fresh-setup gate passes.
+> **Day 1 scaffold available:** the commands below now exist. Read-only and offline commands can be run after `npm ci`; live commands still require non-placeholder configuration and the explicit authorization described below.
 
 ### 1. Prerequisites
 
@@ -485,6 +484,8 @@ SESSION_SECRET=REPLACE_WITH_RANDOM_SECRET
 Implement one explicit backend/script environment loader for the root `.env`. The web app only receives public configuration such as `NEXT_PUBLIC_API_BASE_URL=http://localhost:4000`, set in its own local environment or deployment settings. **Never copy backend secrets into `NEXT_PUBLIC_*`.** Pass backend secrets directly through the hosting platform in production.
 
 ENS owner/operator signing keys belong in a separate local, ignored setup environment loaded only by ENS administration scripts. They must never be required by the running web app or backend. Provider receivers do not need private keys merely to receive native HBAR. Validate identifiers and reject placeholder values at startup.
+
+Copy `.env.ens-setup.example` to the ignored `.env.ens-setup` only when preparing an authorized Sepolia record update. The Day 1 setup command updates records on an already registered name through its currently active resolver; it deliberately does not assume ownership, deploy a resolver, or register a name automatically.
 
 Localhost origins are allowed only in explicit development mode. The hosted service must use HTTPS and explicit origin allowlists. Configure database TLS according to the provider; do not disable certificate verification to make a connection work.
 
