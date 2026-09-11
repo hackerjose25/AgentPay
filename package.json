@@ -27,6 +27,7 @@
     "ens:setup": "node --import tsx scripts/ens-setup.ts",
     "ens:verify": "node --import tsx scripts/ens-verify.ts",
     "directory:add": "node --import tsx scripts/directory-add.ts",
+    "recover:paid-extraction": "node --import tsx scripts/recover-paid-extraction.ts",
     "smoke:testnet": "node --import tsx scripts/smoke-testnet.ts"
   },
   "devDependencies": {

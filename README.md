@@ -29,7 +29,7 @@ AgentPay is an AI service router. Give the agent an invoice and a spending limit
 
 > 🌐 ENS identifies → 🧭 AgentPay selects → 💸 Blocky402 settles on Hedera → 📄 Service returns the result
 
-**Implementation status: Day 1 scaffold, September 11, 2026.** The Node 22 npm workspace, shared schemas/policy, Express and Next.js shells, PostgreSQL migration, synthetic fixture, ENS read/setup scripts, strict x402 route/client, Gemini extraction adapter, and readiness commands now exist. Offline verification is recorded in `HISTORY.md`. The configured Supabase connection, Sepolia RPC, Blocky402 capability endpoint, Gemini model metadata, and Hedera testnet account identities passed read-only readiness checks; migration `001_initial.sql` is applied to the configured Supabase database, and the backend is live at `https://agentpay-api-sbwi.onrender.com`. Alpha's seven application records resolve from `alpha.ocr.agentpayapp.eth`. The first authorized x402 request settled exactly `1000000` tinybars to Alpha on Hedera Testnet, but the deployed Gemini 2.5 Flash route returned HTTP 500 because Google no longer makes that model available to new API users. The local adapter and deployment configuration now target Gemini 3.6 Flash and pass offline plus metadata checks, but are not redeployed or invoked yet. Treat the request as paid-but-failed; do not retry or claim the complete journey until the original request is recovered.
+**Implementation status: Day 1 scaffold, September 11, 2026.** The Node 22 npm workspace, shared schemas/policy, Express and Next.js shells, PostgreSQL migration, synthetic fixture, ENS read/setup scripts, strict x402 route/client, Gemini extraction adapter, and readiness commands now exist. Offline verification is recorded in `HISTORY.md`. The configured Supabase connection, Sepolia RPC, Blocky402 capability endpoint, Gemini model metadata, and Hedera testnet account identities passed read-only readiness checks; migration `001_initial.sql` is applied to the configured Supabase database, and the Gemini 3.6 Flash backend is live at `https://agentpay-api-sbwi.onrender.com`. Alpha's seven application records resolve from `alpha.ocr.agentpayapp.eth`. The first authorized x402 request settled exactly `1000000` tinybars to Alpha on Hedera Testnet, but the earlier Gemini 2.5 Flash deployment failed after settlement because Google no longer makes that model available to new API users. A lease-protected, no-payment recovery then invoked Gemini 3.6 Flash once, persisted the expected schema-valid extraction on the original request, and left exactly one settled payment. This proves the integration through operator recovery; a deployed browser journey and payer-authenticated public recovery route remain later milestones.
 
 **Scope decision:** target ENS and Hedera only. The Graph, subgraphs, cross-chain receipt contracts, and on-chain reputation scoring are deferred. Application history is stored in a database.
 
@@ -508,6 +508,8 @@ These are project scripts to implement, not commands supplied automatically by t
 | `npm run test:e2e` | Browser test using explicit fixtures/mocks | Isolated test data only |
 | `npm run smoke:testnet -- --dry-run` | Check live ENS and unsigned 402 requirements | No payment |
 | `npm run smoke:testnet -- --pay` | Execute one capped real testnet invoice request | Testnet HBAR transfer; possible upstream model cost |
+| `npm run recover:paid-extraction -- --dry-run --request-id <id>` | Validate a failed synthetic smoke request already backed by one settled payment | Database reads only |
+| `npm run recover:paid-extraction -- --apply --request-id <id>` | Lease and retry only the extraction for that settled synthetic request | Database writes; one model inference; no payment |
 | `npm run build` | Build shared package, server, and web | Local build output |
 | `npm run start` | Start built web/server processes | Runtime requests may spend only through authorized flow |
 
@@ -541,6 +543,8 @@ npm run smoke:testnet -- --dry-run
 ```
 
 Run `npm run smoke:testnet -- --pay` only when the configured testnet payer, cap, recipients, and upstream model costs are approved. The smoke test must report the actual settlement transaction and validate the returned extraction schema.
+
+If a synthetic smoke request settles but extraction fails, do not run the paid command again. First run the recovery command in `--dry-run` mode with the exact request ID. Its `--apply` mode requires separate authorization for one model inference, acquires a database execution lease, and can complete only a request whose original payment is still `SETTLED` with a `CONSUMED` reservation. It never creates or submits a payment.
 
 ### 6. Deploy
 
