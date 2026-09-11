@@ -1,0 +1,62 @@
+services:
+  - type: web
+    name: agentpay-api
+    runtime: node
+    plan: free
+    autoDeployTrigger: off
+    buildCommand: npm ci && npm run build -w @agentpay/core && npm run build -w @agentpay/server
+    startCommand: npm run start -w @agentpay/server
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_VERSION
+        value: 22.23.2
+      - key: NODE_ENV
+        value: production
+      - key: WEB_ORIGIN
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: ENS_RPC_URL
+        sync: false
+      - key: ENS_CHAIN_ID
+        value: "11155111"
+      - key: ENS_PARENT_NAME
+        value: agentpayapp.eth
+      - key: ENS_PROVIDER_NAMES
+        value: alpha.ocr.agentpayapp.eth
+      - key: HEDERA_NETWORK
+        value: hedera:testnet
+      - key: HEDERA_AGENT_ACCOUNT_ID
+        sync: false
+      - key: HEDERA_AGENT_PRIVATE_KEY
+        sync: false
+      - key: BLOCKY402_FACILITATOR_URL
+        value: https://api.testnet.blocky402.com
+      - key: PAYMENT_ASSET
+        value: 0.0.0
+      - key: ALPHA_RECIPIENT_ACCOUNT_ID
+        sync: false
+      - key: BETA_RECIPIENT_ACCOUNT_ID
+        sync: false
+      - key: ALPHA_PRICE_TINYBARS
+        value: "1000000"
+      - key: BETA_PRICE_TINYBARS
+        value: "2000000"
+      - key: PROVIDER_ALLOWED_ORIGINS
+        sync: false
+      - key: MAX_SPEND_PER_REQUEST_TINYBARS
+        value: "5000000"
+      - key: MAX_SPEND_PER_TASK_TINYBARS
+        value: "20000000"
+      - key: MAX_SPEND_PER_DAY_TINYBARS
+        value: "100000000"
+      - key: MAX_INPUT_BYTES
+        value: "5000000"
+      - key: MAX_INPUT_PIXELS
+        value: "20000000"
+      - key: RESULT_RETENTION_HOURS
+        value: "24"
+      - key: DEMO_ACCESS_CODE
+        sync: false
+      - key: SESSION_SECRET
+        generateValue: true

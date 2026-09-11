@@ -22,3 +22,14 @@ export function jsonLog(value: unknown): void {
   process.stdout.write(`${JSON.stringify(value, null, 2)}\n`);
 }
 
+export function safeErrorDetail(context: string, error: unknown): string {
+  const candidates = [error, typeof error === "object" && error !== null && "cause" in error ? error.cause : undefined];
+  for (const candidate of candidates) {
+    if (typeof candidate !== "object" || candidate === null || !("code" in candidate)) continue;
+    const code = candidate.code;
+    if (typeof code === "string" && /^[A-Z][A-Z0-9_]{1,63}$/.test(code)) {
+      return `${context} check failed (${code})`;
+    }
+  }
+  return `${context} check failed`;
+}

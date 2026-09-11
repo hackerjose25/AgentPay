@@ -29,7 +29,7 @@ AgentPay is an AI service router. Give the agent an invoice and a spending limit
 
 > 🌐 ENS identifies → 🧭 AgentPay selects → 💸 Blocky402 settles on Hedera → 📄 Service returns the result
 
-**Implementation status: Day 1 scaffold, September 10, 2026.** The Node 22 npm workspace, shared schemas/policy, Express and Next.js shells, PostgreSQL migration, synthetic fixture, ENS read/setup scripts, strict x402 proof route/client, and readiness commands now exist. Offline verification is recorded in `HISTORY.md`. Live ENS writes, database migration, account funding, and paid Hedera settlement remain unverified and must not be represented as complete until their authorized testnet evidence is recorded.
+**Implementation status: Day 1 scaffold, September 10, 2026.** The Node 22 npm workspace, shared schemas/policy, Express and Next.js shells, PostgreSQL migration, synthetic fixture, ENS read/setup scripts, strict x402 proof route/client, and readiness commands now exist. Offline verification is recorded in `HISTORY.md`. The configured Supabase connection, Sepolia RPC, and Blocky402 capability endpoint pass readiness checks, and migration `001_initial.sql` is applied to the configured Supabase database. The ENSv2 hierarchy through `alpha.ocr.agentpayapp.eth` is live on Sepolia; its application records are not written yet. Account balances/signing, transaction-level persistence behavior, and paid Hedera settlement remain unverified and must not be represented as complete until their authorized testnet evidence is recorded.
 
 **Scope decision:** target ENS and Hedera only. The Graph, subgraphs, cross-chain receipt contracts, and on-chain reputation scoring are deferred. Application history is stored in a database.
 
@@ -485,7 +485,7 @@ Implement one explicit backend/script environment loader for the root `.env`. Th
 
 ENS owner/operator signing keys belong in a separate local, ignored setup environment loaded only by ENS administration scripts. They must never be required by the running web app or backend. Provider receivers do not need private keys merely to receive native HBAR. Validate identifiers and reject placeholder values at startup.
 
-Copy `.env.ens-setup.example` to the ignored `.env.ens-setup` only when preparing an authorized Sepolia record update. The Day 1 setup command updates records on an already registered name through its currently active resolver; it deliberately does not assume ownership, deploy a resolver, or register a name automatically.
+Copy `.env.ens-setup.example` to the ignored `.env.ens-setup` only when preparing an authorized Sepolia record update. It inherits `ENS_RPC_URL` and `ENS_CHAIN_ID` from `.env`; keep the signer and other write-only values in `.env.ens-setup`. The Day 1 setup command updates records on an already registered name through its currently active resolver; it deliberately does not assume ownership, deploy a resolver, or register a name automatically.
 
 Localhost origins are allowed only in explicit development mode. The hosted service must use HTTPS and explicit origin allowlists. Configure database TLS according to the provider; do not disable certificate verification to make a connection work.
 
@@ -544,7 +544,11 @@ Run `npm run smoke:testnet -- --pay` only when the configured testnet payer, cap
 
 ### 6. Deploy
 
-Build and test first. Configure backend secrets, persistent PostgreSQL storage, and the model endpoint on Render; configure only public API connection settings on Vercel. Update ENS endpoint records to the deployed HTTPS URLs, update origin allowlists, and rerun the deployed smoke test. Ensure the backend stays available during asynchronous judging and that redeploys preserve request/payment state.
+Build and test first. The root `render.yaml` defines the backend as a native Node 22 web service, builds only the shared core and server workspaces, starts `@agentpay/server`, and checks `/health`. It deliberately disables automatic deploys and selects Render's free plan so importing the Blueprint cannot opt into a paid compute plan; choose an always-on plan explicitly if required for judging.
+
+In Render, create a Blueprint from this repository. Supply every value marked `sync: false` during the initial Blueprint creation; Render does not prompt for newly added `sync: false` values on later syncs. Copy values from the private runtime `.env`, never from `.env.ens-setup`, and do not commit them. Use the eventual Vercel HTTPS origin for `WEB_ORIGIN`. For the first backend boot, set `PROVIDER_ALLOWED_ORIGINS` to an explicit temporary HTTPS origin; as soon as Render assigns the service URL, replace it with that exact origin and redeploy before publishing ENS endpoint records. Render supplies `PORT`, and the Blueprint generates a separate production `SESSION_SECRET`.
+
+Do not add the optional model-adapter variables until real extraction is implemented; they are not consumed by the current Day 1 payment-path server. Continue using the existing Supabase `DATABASE_URL`; the Blueprint does not create or replace the database. Configure only `NEXT_PUBLIC_API_BASE_URL` with the deployed Render HTTPS origin on Vercel. Update ENS endpoint records only after the backend URL and allowlist agree, then rerun the deployed smoke test. Ensure the backend stays available during asynchronous judging and that redeploys preserve request/payment state.
 
 Do not rely on a developer laptop's local model for the final live service unless its availability is deliberately arranged and documented. Keep a recording of a genuine successful run as evidence; it does not replace the live-service requirement.
 

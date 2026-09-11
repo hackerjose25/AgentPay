@@ -3,7 +3,7 @@ import { createPublicClient, http } from "viem";
 import { sepolia } from "viem/chains";
 import { requiredRuntimeKeys } from "../apps/server/src/config.js";
 import { fetchHederaFacilitatorSupport } from "../apps/server/src/payments/facilitator.js";
-import { hasPlaceholder, jsonLog, loadRootEnv } from "./shared.js";
+import { hasPlaceholder, jsonLog, loadRootEnv, safeErrorDetail } from "./shared.js";
 
 loadRootEnv();
 type Check = { name: string; ok: boolean; detail: string };
@@ -20,7 +20,7 @@ async function check(name: string, action: () => Promise<string>): Promise<void>
   try {
     checks.push({ name, ok: true, detail: await action() });
   } catch (error) {
-    checks.push({ name, ok: false, detail: error instanceof Error ? error.message : "unknown failure" });
+    checks.push({ name, ok: false, detail: safeErrorDetail(name, error) });
   }
 }
 
@@ -70,4 +70,3 @@ for (const [name, urlKey, keyKey] of [
 
 jsonLog({ ok: checks.every(({ ok }) => ok), checks });
 if (checks.some(({ ok }) => !ok)) process.exitCode = 1;
-

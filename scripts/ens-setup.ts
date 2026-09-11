@@ -4,6 +4,7 @@ import { sepolia } from "viem/chains";
 import { namehash, normalize } from "viem/ens";
 import { jsonLog, loadRootEnv, requiredValue } from "./shared.js";
 
+loadRootEnv();
 loadRootEnv(".env.ens-setup");
 const apply = process.argv.includes("--apply");
 const dryRun = process.argv.includes("--dry-run");
@@ -55,4 +56,3 @@ const transactionHash = await wallet.writeContract({
 const receipt = await client.waitForTransactionReceipt({ hash: transactionHash });
 jsonLog({ name, chainId: 11155111, transactionHash, blockNumber: receipt.blockNumber.toString(), status: receipt.status });
 if (receipt.status !== "success") process.exitCode = 1;
-
