@@ -48,22 +48,24 @@ if (process.env.BLOCKY402_FACILITATOR_URL === "https://api.testnet.blocky402.com
   });
 }
 
-for (const [name, urlKey, keyKey] of [
-  ["agent-model", "AGENT_MODEL_BASE_URL", "AGENT_MODEL_API_KEY"],
-  ["extraction-model", "EXTRACTION_MODEL_BASE_URL", "EXTRACTION_MODEL_API_KEY"]
+for (const [name, urlKey, keyKey, modelKey] of [
+  ["agent-model", "AGENT_MODEL_BASE_URL", "AGENT_MODEL_API_KEY", "AGENT_MODEL_ID"],
+  ["extraction-model", "EXTRACTION_MODEL_BASE_URL", "EXTRACTION_MODEL_API_KEY", "EXTRACTION_MODEL_ID"]
 ] as const) {
-  if (!hasPlaceholder(process.env[urlKey]) && !hasPlaceholder(process.env[keyKey])) {
+  if (!hasPlaceholder(process.env[urlKey]) && !hasPlaceholder(process.env[keyKey]) && !hasPlaceholder(process.env[modelKey])) {
     await check(name, async () => {
-      const url = new URL(process.env[urlKey]!);
-      if (url.protocol !== "https:") throw new Error("model endpoint must use HTTPS");
+      const baseUrl = new URL(process.env[urlKey]!);
+      if (baseUrl.protocol !== "https:" || baseUrl.hostname !== "generativelanguage.googleapis.com") {
+        throw new Error("model endpoint must be the HTTPS Gemini Developer API");
+      }
+      const url = new URL(`${baseUrl.pathname.replace(/\/$/, "")}/models/${encodeURIComponent(process.env[modelKey]!)}`, baseUrl.origin);
       const response = await fetch(url, {
-        method: "HEAD",
-        headers: { authorization: `Bearer ${process.env[keyKey]!}` },
+        headers: { "x-goog-api-key": process.env[keyKey]! },
         redirect: "error",
         signal: AbortSignal.timeout(8_000)
       });
-      if (response.status >= 500) throw new Error(`model endpoint returned HTTP ${response.status}`);
-      return `endpoint responded with HTTP ${response.status} without inference`;
+      if (!response.ok) throw new Error(`Gemini model metadata returned HTTP ${response.status}`);
+      return `Gemini model metadata responded with HTTP ${response.status}; no inference invoked`;
     });
   }
 }

@@ -32,6 +32,7 @@ export function exactlyMatches(requirement: PaymentRequirements, expected: Expec
 export async function executeExpectedPayment(
   expected: ExpectedPayment,
   body: BodyInit,
+  contentType: "application/json" | "image/png" | "image/jpeg",
   callbacks: PaymentCallbacks = {}
 ): Promise<Response> {
   if (expected.endpoint.protocol !== "https:" && expected.endpoint.hostname !== "localhost") {
@@ -78,7 +79,7 @@ export async function executeExpectedPayment(
     return await paidFetch(expected.endpoint, {
       method: "POST",
       headers: {
-        "content-type": "application/json",
+        "content-type": contentType,
         "idempotency-key": expected.requestId,
         "x-request-id": expected.requestId
       },

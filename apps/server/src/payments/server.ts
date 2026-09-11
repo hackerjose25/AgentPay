@@ -23,7 +23,7 @@ export function createProviderPaymentMiddleware(config: RuntimeConfig) {
           maxTimeoutSeconds: 60,
           extra: { paymentFlow: "upfront" }
         },
-        description: "AgentPay Day 1 paid-path proof for provider alpha",
+        description: "AgentPay invoice extraction by provider alpha",
         mimeType: "application/json"
       },
       "POST /providers/beta/extract": {
@@ -35,11 +35,10 @@ export function createProviderPaymentMiddleware(config: RuntimeConfig) {
           maxTimeoutSeconds: 60,
           extra: { paymentFlow: "upfront" }
         },
-        description: "AgentPay Day 1 paid-path proof for provider beta",
+        description: "AgentPay invoice extraction by provider beta",
         mimeType: "application/json"
       }
     },
     resourceServer
   );
 }
-

@@ -1,13 +1,22 @@
 import cors from "cors";
-import express from "express";
+import express, { type RequestHandler } from "express";
 import type { RuntimeConfig } from "./config.js";
+import { createGeminiInvoiceExtractor, type InvoiceExtractor } from "./extraction/gemini.js";
+import { validateInvoiceImage } from "./extraction/image.js";
 import { errorHandler, notFound } from "./http/errors.js";
 import { createProviderPaymentMiddleware } from "./payments/server.js";
 
-export function createApp(config: RuntimeConfig) {
+interface AppDependencies {
+  extractor?: InvoiceExtractor;
+  paymentMiddleware?: RequestHandler;
+}
+
+export function createApp(config: RuntimeConfig, dependencies: AppDependencies = {}) {
   const app = express();
+  const extractor = dependencies.extractor ?? createGeminiInvoiceExtractor(config);
   app.disable("x-powered-by");
   app.use(cors({ origin: config.WEB_ORIGIN, credentials: true }));
+  app.use(express.raw({ type: ["image/png", "image/jpeg"], limit: config.MAX_INPUT_BYTES }));
   app.use(express.json({ limit: "64kb" }));
 
   app.get("/health", (_request, response) => {
@@ -32,16 +41,21 @@ export function createApp(config: RuntimeConfig) {
     });
   });
 
-  app.use(createProviderPaymentMiddleware(config));
+  app.use(dependencies.paymentMiddleware ?? createProviderPaymentMiddleware(config));
 
-  app.post("/providers/:id/extract", (request, response) => {
+  app.post("/providers/:id/extract", async (request, response) => {
     const provider = request.params.id;
     if (provider !== "alpha" && provider !== "beta") return notFound(request, response);
+    const image = validateInvoiceImage(request.body, request.header("content-type"), {
+      maxBytes: config.MAX_INPUT_BYTES,
+      maxPixels: config.MAX_INPUT_PIXELS
+    });
+    const extraction = await extractor.extract(image);
     response.json({
       ok: true,
       provider,
       requestId: request.header("x-request-id") ?? null,
-      proof: "day-1-payment-path"
+      extraction
     });
   });
 

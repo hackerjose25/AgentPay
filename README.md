@@ -29,7 +29,7 @@ AgentPay is an AI service router. Give the agent an invoice and a spending limit
 
 > 🌐 ENS identifies → 🧭 AgentPay selects → 💸 Blocky402 settles on Hedera → 📄 Service returns the result
 
-**Implementation status: Day 1 scaffold, September 10, 2026.** The Node 22 npm workspace, shared schemas/policy, Express and Next.js shells, PostgreSQL migration, synthetic fixture, ENS read/setup scripts, strict x402 proof route/client, and readiness commands now exist. Offline verification is recorded in `HISTORY.md`. The configured Supabase connection, Sepolia RPC, and Blocky402 capability endpoint pass readiness checks, and migration `001_initial.sql` is applied to the configured Supabase database. The ENSv2 hierarchy through `alpha.ocr.agentpayapp.eth` is live on Sepolia; its application records are not written yet. Account balances/signing, transaction-level persistence behavior, and paid Hedera settlement remain unverified and must not be represented as complete until their authorized testnet evidence is recorded.
+**Implementation status: Day 1 scaffold, September 11, 2026.** The Node 22 npm workspace, shared schemas/policy, Express and Next.js shells, PostgreSQL migration, synthetic fixture, ENS read/setup scripts, strict x402 route/client, Gemini 2.5 Flash extraction adapter, and readiness commands now exist. Offline verification is recorded in `HISTORY.md`. The configured Supabase connection, Sepolia RPC, and Blocky402 capability endpoint passed readiness checks, migration `001_initial.sql` is applied to the configured Supabase database, and the previous proof-only backend is live at `https://agentpay-api-sbwi.onrender.com`. The real extraction changes in the current checkout are not deployed or live-tested yet. The ENSv2 hierarchy through `alpha.ocr.agentpayapp.eth` is live on Sepolia; its application records are not written yet. Account balances/signing, transaction-level persistence behavior, Gemini quota/output, and paid Hedera settlement remain unverified and must not be represented as complete until their authorized testnet evidence is recorded.
 
 **Scope decision:** target ENS and Hedera only. The Graph, subgraphs, cross-chain receipt contracts, and on-chain reputation scoring are deferred. Application history is stored in a database.
 
@@ -359,7 +359,7 @@ These routes are proposed and must be implemented. Use JSON errors shaped as `{ 
 | `POST /api/runs` | Start bounded task execution with `Idempotency-Key` | Can create one approved payment |
 | `GET /api/runs/:id` | Session-scoped status, trace, and result | None; never restarts payment |
 | `GET /providers/:id/offer` | Public capability, current price, network, asset, recipient | None |
-| `POST /providers/:id/extract` | x402-gated image extraction | Requires a valid payment for a new request |
+| `POST /providers/:id/extract` | x402-gated raw PNG/JPEG extraction returning the validated invoice schema | Requires a valid payment for a new request; request `Content-Type` must match the actual image |
 | `POST /providers/:id/recover` | Recover a paid request with payer-bound authentication | None; never creates a new payment |
 
 Implement upload handling inside the run API: accept one PNG/JPEG, validate actual file type and dimensions, cap encoded/decoded size, and compute a canonical hash. Do not accept arbitrary remote image URLs in the MVP. Offer requests do not receive the invoice; only the selected execution service receives it.
@@ -462,13 +462,13 @@ ALPHA_PRICE_TINYBARS=1000000
 BETA_PRICE_TINYBARS=2000000
 PROVIDER_ALLOWED_ORIGINS=http://localhost:4000
 
-# Dedicated adapters; select actual supported models during integration
-AGENT_MODEL_BASE_URL=https://YOUR_AGENT_MODEL_ENDPOINT
-AGENT_MODEL_API_KEY=REPLACE_ME
-AGENT_MODEL_ID=REPLACE_ME
-EXTRACTION_MODEL_BASE_URL=https://YOUR_VISION_MODEL_ENDPOINT
-EXTRACTION_MODEL_API_KEY=REPLACE_ME
-EXTRACTION_MODEL_ID=REPLACE_ME
+# Gemini Developer API adapters; keep the AI Studio key server-side
+AGENT_MODEL_BASE_URL=https://generativelanguage.googleapis.com/v1beta
+AGENT_MODEL_API_KEY=REPLACE_WITH_GEMINI_API_KEY
+AGENT_MODEL_ID=gemini-2.5-flash
+EXTRACTION_MODEL_BASE_URL=https://generativelanguage.googleapis.com/v1beta
+EXTRACTION_MODEL_API_KEY=REPLACE_WITH_GEMINI_API_KEY
+EXTRACTION_MODEL_ID=gemini-2.5-flash
 
 # Server policy; client requests cannot raise these caps
 MAX_SPEND_PER_REQUEST_TINYBARS=5000000

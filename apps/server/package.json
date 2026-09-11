@@ -12,13 +12,16 @@
   },
   "dependencies": {
     "@agentpay/core": "*",
+    "@ai-sdk/google": "4.0.67",
     "@x402/core": "2.25.0",
     "@x402/express": "2.25.0",
     "@x402/fetch": "2.25.0",
     "@x402/hedera": "2.25.0",
+    "ai": "7.0.97",
     "cors": "2.8.6",
     "dotenv": "17.4.2",
     "express": "5.2.1",
+    "image-size": "2.0.2",
     "pg": "8.23.0",
     "viem": "2.56.3",
     "zod": "4.6.1"

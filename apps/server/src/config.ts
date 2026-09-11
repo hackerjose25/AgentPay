@@ -7,6 +7,10 @@ loadDotenv({ path: resolve(process.cwd(), ".env"), quiet: true });
 const placeholderPattern = /(?:REPLACE_ME|YOUR_|USER:PASSWORD|CHANGE_ME)/i;
 const nonPlaceholder = z.string().min(1).refine((value) => !placeholderPattern.test(value), "placeholder value is not allowed");
 const tinybarEnv = z.string().regex(/^[1-9]\d*$/).transform(BigInt);
+const geminiBaseUrl = nonPlaceholder.pipe(z.url({ protocol: /^https$/ })).refine((value) => {
+  const url = new URL(value);
+  return url.hostname === "generativelanguage.googleapis.com" && url.pathname.replace(/\/$/, "") === "/v1beta";
+}, "Gemini base URL must be https://generativelanguage.googleapis.com/v1beta");
 
 const runtimeEnvSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
@@ -27,6 +31,12 @@ const runtimeEnvSchema = z.object({
   ALPHA_PRICE_TINYBARS: tinybarEnv,
   BETA_PRICE_TINYBARS: tinybarEnv,
   PROVIDER_ALLOWED_ORIGINS: nonPlaceholder.transform((value) => value.split(",").map((origin) => origin.trim())),
+  AGENT_MODEL_BASE_URL: geminiBaseUrl,
+  AGENT_MODEL_API_KEY: nonPlaceholder,
+  AGENT_MODEL_ID: z.literal("gemini-2.5-flash"),
+  EXTRACTION_MODEL_BASE_URL: geminiBaseUrl,
+  EXTRACTION_MODEL_API_KEY: nonPlaceholder,
+  EXTRACTION_MODEL_ID: z.literal("gemini-2.5-flash"),
   MAX_SPEND_PER_REQUEST_TINYBARS: tinybarEnv,
   MAX_SPEND_PER_TASK_TINYBARS: tinybarEnv,
   MAX_SPEND_PER_DAY_TINYBARS: tinybarEnv,

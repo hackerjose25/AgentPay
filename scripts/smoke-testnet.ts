@@ -2,8 +2,9 @@ import { createHash, randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { decodePaymentRequiredHeader } from "@x402/core/http";
-import { providerOfferSchema, selectCheapestEligible, type Candidate } from "@agentpay/core";
+import { invoiceExtractionSchema, providerOfferSchema, selectCheapestEligible, type Candidate } from "@agentpay/core";
 import { Client } from "pg";
+import { z } from "zod";
 import { resolveProviderMetadata } from "../apps/server/src/ens/resolver.js";
 import { reserveBudget, createPool } from "../apps/server/src/persistence/database.js";
 import { executeExpectedPayment } from "../apps/server/src/payments/client.js";
@@ -89,7 +90,8 @@ const databaseUrl = requiredValue("DATABASE_URL");
 const payerAccountId = requiredValue("HEDERA_AGENT_ACCOUNT_ID");
 const payerPrivateKey = requiredValue("HEDERA_AGENT_PRIVATE_KEY");
 const fixturePath = resolve(projectRoot, "fixtures/synthetic-invoice.png");
-const inputHash = createHash("sha256").update(await readFile(fixturePath)).digest("hex");
+const fixtureBytes = await readFile(fixturePath);
+const inputHash = createHash("sha256").update(fixtureBytes).digest("hex");
 const idempotencyArgument = process.argv.indexOf("--idempotency-key");
 const idempotencyKey = idempotencyArgument >= 0 ? process.argv[idempotencyArgument + 1] : `day1-${inputHash}`;
 if (!idempotencyKey) throw new Error("--idempotency-key requires a value");
@@ -168,7 +170,7 @@ try {
     payerAccountId,
     payerPrivateKey,
     requestId
-  }, JSON.stringify({ inputHash, fixture: "synthetic-invoice.png" }), {
+  }, fixtureBytes, "image/png", {
     onSigned: async (transactionId) => {
       await pool.query(`
         UPDATE payments SET status = 'SUBMITTING', transaction_reference = $2, submitted_at = now(), updated_at = now()
@@ -197,8 +199,18 @@ try {
     }
   });
   if (!response.ok) throw new Error(`paid endpoint returned HTTP ${response.status}`);
-  const result: unknown = await response.json();
-  jsonLog({ mode: "pay", requestId, selected: selected.metadata.name, result });
+  const result = z.object({
+    ok: z.literal(true),
+    provider: z.enum(["alpha", "beta"]),
+    requestId: z.string().nullable(),
+    extraction: invoiceExtractionSchema
+  }).parse(await response.json());
+  await pool.query(`
+    UPDATE requests
+    SET execution_status = 'SUCCEEDED', result = $2, error = NULL, updated_at = now()
+    WHERE id = $1 AND execution_status IN ('NOT_STARTED', 'RUNNING')
+  `, [requestId, JSON.stringify(result.extraction)]);
+  jsonLog({ mode: "pay", requestId, selected: selected.metadata.name, extraction: result.extraction });
 } finally {
   await pool.end();
 }
