@@ -9,6 +9,7 @@ import { resolveProviderMetadata } from "../apps/server/src/ens/resolver.js";
 import { reserveBudget, createPool } from "../apps/server/src/persistence/database.js";
 import { executeExpectedPayment } from "../apps/server/src/payments/client.js";
 import { fetchHederaFacilitatorSupport } from "../apps/server/src/payments/facilitator.js";
+import { waitForProviderReadiness } from "../apps/server/src/readiness/provider.js";
 import { validateServiceEndpoint } from "../apps/server/src/security/endpoints.js";
 import { jsonLog, loadRootEnv, projectRoot, requiredValue, safeErrorDetail } from "./shared.js";
 
@@ -28,15 +29,40 @@ const allowedOrigins = new Set(requiredValue("PROVIDER_ALLOWED_ORIGINS").split("
 const maxPerRequest = BigInt(requiredValue("MAX_SPEND_PER_REQUEST_TINYBARS"));
 const candidates: Candidate[] = [];
 const unavailable: Array<{ name: string; reason: string }> = [];
+const readiness: Array<{ name: string; attempts: number; waitedMs: number }> = [];
+
+function optionalArgument(name: string): string | undefined {
+  const index = process.argv.indexOf(name);
+  const value = index >= 0 ? process.argv[index + 1] : undefined;
+  if (index >= 0 && !value) throw new Error(`${name} requires a value`);
+  return value;
+}
 
 for (const name of names) {
   try {
-    const metadata = await resolveProviderMetadata(name, rpcUrl);
+    let metadata = await resolveProviderMetadata(name, rpcUrl);
+    let wakeResult: Awaited<ReturnType<typeof waitForProviderReadiness>> | undefined;
+    let stableEndpoint = false;
+    for (let endpointCheck = 0; endpointCheck < 2; endpointCheck += 1) {
+      const initialBase = validateServiceEndpoint(metadata.endpoint, allowedOrigins, process.env.NODE_ENV === "development");
+      const initialOfferUrl = new URL(`${initialBase.pathname.replace(/\/$/, "")}/offer`, initialBase.origin);
+      wakeResult = await waitForProviderReadiness(initialOfferUrl);
+      const refreshed = await resolveProviderMetadata(name, rpcUrl);
+      if (refreshed.endpoint === metadata.endpoint) {
+        metadata = refreshed;
+        stableEndpoint = true;
+        break;
+      }
+      metadata = refreshed;
+    }
+    if (!stableEndpoint || !wakeResult) throw new Error("provider endpoint changed repeatedly during readiness");
+
     const base = validateServiceEndpoint(metadata.endpoint, allowedOrigins, process.env.NODE_ENV === "development");
     const offerUrl = new URL(`${base.pathname.replace(/\/$/, "")}/offer`, base.origin);
     const response = await fetch(offerUrl, { redirect: "error", signal: AbortSignal.timeout(30_000) });
     if (!response.ok) throw new Error(`offer returned HTTP ${response.status}`);
     candidates.push({ metadata, offer: providerOfferSchema.parse(await response.json()) });
+    readiness.push({ name, attempts: wakeResult.attempts, waitedMs: wakeResult.waitedMs });
   } catch (error) {
     unavailable.push({ name, reason: safeErrorDetail("provider discovery", error) });
   }
@@ -53,32 +79,34 @@ const extractUrl = new URL(`${providerBase.pathname.replace(/\/$/, "")}/extract`
 validateServiceEndpoint(extractUrl.toString(), allowedOrigins, process.env.NODE_ENV === "development");
 const support = await fetchHederaFacilitatorSupport(facilitatorUrl);
 const proofRequestId = randomUUID();
+const response = await fetch(extractUrl, {
+  method: "POST",
+  headers: { "content-type": "application/json", "x-request-id": proofRequestId },
+  body: JSON.stringify({ proof: "day-1-payment-path" }),
+  redirect: "error",
+  signal: AbortSignal.timeout(30_000)
+});
+if (response.status !== 402) throw new Error(`expected HTTP 402, received ${response.status}`);
+const header = response.headers.get("payment-required");
+if (!header) throw new Error("HTTP 402 did not include PAYMENT-REQUIRED");
+const paymentRequired = decodePaymentRequiredHeader(header);
+const exactMatch = paymentRequired.x402Version === 2 && paymentRequired.accepts.some((requirement) =>
+  requirement.scheme === "exact"
+  && requirement.network === "hedera:testnet"
+  && requirement.asset === "0.0.0"
+  && requirement.amount === selected.offer.amount
+  && requirement.payTo === selected.metadata.recipient
+  && requirement.extra.paymentFlow === "upfront"
+);
+if (!exactMatch) throw new Error("HTTP 402 requirements differ from the selected ENS metadata and offer");
+const prepaymentValidatedAt = Date.now();
 
 if (dryRun) {
-  const response = await fetch(extractUrl, {
-    method: "POST",
-    headers: { "content-type": "application/json", "x-request-id": proofRequestId },
-    body: JSON.stringify({ proof: "day-1-payment-path" }),
-    redirect: "error",
-    signal: AbortSignal.timeout(15_000)
-  });
-  if (response.status !== 402) throw new Error(`expected HTTP 402, received ${response.status}`);
-  const header = response.headers.get("payment-required");
-  if (!header) throw new Error("HTTP 402 did not include PAYMENT-REQUIRED");
-  const paymentRequired = decodePaymentRequiredHeader(header);
-  const exactMatch = paymentRequired.x402Version === 2 && paymentRequired.accepts.some((requirement) =>
-    requirement.scheme === "exact"
-    && requirement.network === "hedera:testnet"
-    && requirement.asset === "0.0.0"
-    && requirement.amount === selected.offer.amount
-    && requirement.payTo === selected.metadata.recipient
-    && requirement.extra.paymentFlow === "upfront"
-  );
-  if (!exactMatch) throw new Error("HTTP 402 requirements differ from the selected ENS metadata and offer");
   jsonLog({
     mode: "dry-run",
     facilitator: { url: facilitatorUrl, x402Version: support.x402Version, feePayer: support.feePayer },
     selected: { name: selected.metadata.name, endpoint: selected.metadata.endpoint, amount: selected.offer.amount },
+    readiness,
     http402Validated: true,
     excluded: selection.excluded,
     unavailable
@@ -89,12 +117,25 @@ if (dryRun) {
 const databaseUrl = requiredValue("DATABASE_URL");
 const payerAccountId = requiredValue("HEDERA_AGENT_ACCOUNT_ID");
 const payerPrivateKey = requiredValue("HEDERA_AGENT_PRIVATE_KEY");
-const fixturePath = resolve(projectRoot, "fixtures/synthetic-invoice.png");
+const fixtureName = optionalArgument("--fixture") ?? "synthetic-invoice.png";
+if (!/^[a-z0-9][a-z0-9.-]*\.(?:png|jpe?g)$/.test(fixtureName)) throw new Error("--fixture must name one PNG or JPEG in fixtures/");
+const fixturePath = resolve(projectRoot, "fixtures", fixtureName);
 const fixtureBytes = await readFile(fixturePath);
+const fixtureMimeType = fixtureName.endsWith(".png") ? "image/png" : "image/jpeg";
 const inputHash = createHash("sha256").update(fixtureBytes).digest("hex");
 const idempotencyArgument = process.argv.indexOf("--idempotency-key");
 const idempotencyKey = idempotencyArgument >= 0 ? process.argv[idempotencyArgument + 1] : `day1-${inputHash}`;
 if (!idempotencyKey) throw new Error("--idempotency-key requires a value");
+const expectedName = optionalArgument("--expected");
+if (expectedName && !/^[a-z0-9][a-z0-9.-]*\.expected\.json$/.test(expectedName)) {
+  throw new Error("--expected must name one .expected.json file in fixtures/");
+}
+const expectedExtraction = expectedName
+  ? invoiceExtractionSchema.parse(JSON.parse(await readFile(resolve(projectRoot, "fixtures", expectedName), "utf8")))
+  : undefined;
+if (Date.now() - prepaymentValidatedAt > 30_000 || new Date(selected.offer.expiresAt) <= new Date()) {
+  throw new Error("pre-payment readiness expired before reservation; rerun the command");
+}
 
 const setupClient = new Client({ connectionString: databaseUrl });
 await setupClient.connect();
@@ -107,9 +148,9 @@ try {
   if (!enrolled.rows[0]) throw new Error(`selected provider ${selected.metadata.name} is not enrolled in the directory`);
   const insertedRun = await setupClient.query<{ id: string }>(`
     INSERT INTO runs (id, session_id, idempotency_key, task, capability, budget_tinybars, input_reference, input_hash, routing_snapshot, expires_at)
-    VALUES ($1, 'live-smoke', $2, 'Extract the synthetic invoice', 'invoice-extraction', $3, 'fixture:synthetic-invoice.png', $4, $5, now() + interval '24 hours')
+    VALUES ($1, 'live-smoke', $2, 'Extract the synthetic invoice', 'invoice-extraction', $3, $4, $5, $6, now() + interval '24 hours')
     ON CONFLICT (session_id, idempotency_key) DO NOTHING RETURNING id
-  `, [runId, idempotencyKey, maxPerRequest.toString(), inputHash, JSON.stringify({ selected: selected.metadata.name, offer: selected.offer })]);
+  `, [runId, idempotencyKey, maxPerRequest.toString(), `fixture:${fixtureName}`, inputHash, JSON.stringify({ selected: selected.metadata.name, offer: selected.offer })]);
   if (!insertedRun.rows[0]) {
     const existing = await setupClient.query<{ id: string; input_hash: string; budget_tinybars: string }>(
       "SELECT id, input_hash, budget_tinybars::text FROM runs WHERE session_id = 'live-smoke' AND idempotency_key = $1",
@@ -171,7 +212,7 @@ try {
       payerAccountId,
       payerPrivateKey,
       requestId
-    }, fixtureBytes, "image/png", {
+    }, fixtureBytes, fixtureMimeType, {
       onSigned: async (transactionId) => {
         await pool.query(`
           UPDATE payments SET status = 'SUBMITTING', transaction_reference = $2, submitted_at = now(), updated_at = now()
@@ -211,7 +252,10 @@ try {
       SET execution_status = 'SUCCEEDED', result = $2, error = NULL, updated_at = now()
       WHERE id = $1 AND execution_status IN ('NOT_STARTED', 'RUNNING')
     `, [requestId, JSON.stringify(result.extraction)]);
-    jsonLog({ mode: "pay", requestId, selected: selected.metadata.name, extraction: result.extraction });
+    const expectedMatch = expectedExtraction
+      ? Object.entries(expectedExtraction).every(([key, value]) => result.extraction[key as keyof typeof result.extraction] === value)
+      : undefined;
+    jsonLog({ mode: "pay", requestId, selected: selected.metadata.name, extraction: result.extraction, expected: expectedExtraction, expectedMatch });
   } catch (error) {
     const payment = await pool.query<{ status: string }>("SELECT status FROM payments WHERE id = $1", [reservation.paymentId]);
     if (payment.rows[0]?.status === "SETTLED") {
