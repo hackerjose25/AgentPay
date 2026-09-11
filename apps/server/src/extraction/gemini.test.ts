@@ -18,7 +18,7 @@ const expected = {
 const modelConfig = {
   EXTRACTION_MODEL_API_KEY: "test-key",
   EXTRACTION_MODEL_BASE_URL: "https://generativelanguage.googleapis.com/v1beta",
-  EXTRACTION_MODEL_ID: "gemini-2.5-flash"
+  EXTRACTION_MODEL_ID: "gemini-3.6-flash"
 } as RuntimeConfig;
 
 describe("Gemini invoice extractor", () => {
@@ -32,7 +32,7 @@ describe("Gemini invoice extractor", () => {
     const request = vi.mocked(generate).mock.calls[0]?.[0];
     const message = request?.messages?.[0];
     if (!message || message.role !== "user" || typeof message.content === "string") throw new Error("expected user content parts");
-    expect(message.content.some((part) => part.type === "image" && part.mediaType === "image/png")).toBe(true);
+    expect(message.content.some((part) => part.type === "file" && part.mediaType === "image/png")).toBe(true);
   });
 
   it("rejects model output that violates the invoice contract", async () => {

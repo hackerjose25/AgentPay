@@ -37,7 +37,7 @@ export function createGeminiInvoiceExtractor(config: RuntimeConfig, generate: Ge
                 "Return null for an absent invoice date. Do not guess values that are not visible."
               ].join(" ")
             },
-            { type: "image", image: image.bytes, mediaType: image.mimeType }
+            { type: "file", data: image.bytes, mediaType: image.mimeType }
           ]
         }],
         temperature: 0,

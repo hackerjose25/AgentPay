@@ -10,7 +10,7 @@ import { reserveBudget, createPool } from "../apps/server/src/persistence/databa
 import { executeExpectedPayment } from "../apps/server/src/payments/client.js";
 import { fetchHederaFacilitatorSupport } from "../apps/server/src/payments/facilitator.js";
 import { validateServiceEndpoint } from "../apps/server/src/security/endpoints.js";
-import { jsonLog, loadRootEnv, projectRoot, requiredValue } from "./shared.js";
+import { jsonLog, loadRootEnv, projectRoot, requiredValue, safeErrorDetail } from "./shared.js";
 
 loadRootEnv();
 const pay = process.argv.includes("--pay");
@@ -34,11 +34,11 @@ for (const name of names) {
     const metadata = await resolveProviderMetadata(name, rpcUrl);
     const base = validateServiceEndpoint(metadata.endpoint, allowedOrigins, process.env.NODE_ENV === "development");
     const offerUrl = new URL(`${base.pathname.replace(/\/$/, "")}/offer`, base.origin);
-    const response = await fetch(offerUrl, { redirect: "error", signal: AbortSignal.timeout(8_000) });
+    const response = await fetch(offerUrl, { redirect: "error", signal: AbortSignal.timeout(30_000) });
     if (!response.ok) throw new Error(`offer returned HTTP ${response.status}`);
     candidates.push({ metadata, offer: providerOfferSchema.parse(await response.json()) });
   } catch (error) {
-    unavailable.push({ name, reason: error instanceof Error ? error.message : "unknown provider failure" });
+    unavailable.push({ name, reason: safeErrorDetail("provider discovery", error) });
   }
 }
 
@@ -161,56 +161,68 @@ try {
     perDay: BigInt(requiredValue("MAX_SPEND_PER_DAY_TINYBARS"))
   });
 
-  const response = await executeExpectedPayment({
-    endpoint: extractUrl,
-    amount: selected.offer.amount,
-    asset: "0.0.0",
-    network: "hedera:testnet",
-    recipient: selected.metadata.recipient,
-    payerAccountId,
-    payerPrivateKey,
-    requestId
-  }, fixtureBytes, "image/png", {
-    onSigned: async (transactionId) => {
-      await pool.query(`
-        UPDATE payments SET status = 'SUBMITTING', transaction_reference = $2, submitted_at = now(), updated_at = now()
-        WHERE id = $1 AND status = 'RESERVED'
-      `, [reservation.paymentId, transactionId]);
-    },
-    onSettled: async (settlement) => {
-      const client = await pool.connect();
-      try {
-        await client.query("BEGIN");
-        await client.query(`
-          UPDATE payments SET status = 'SETTLED', transaction_reference = $2, settled_at = now(), updated_at = now()
-          WHERE id = $1 AND status IN ('SUBMITTING', 'UNKNOWN')
-        `, [reservation.paymentId, settlement.transaction]);
-        await client.query("UPDATE budget_reservations SET status = 'CONSUMED' WHERE payment_id = $1 AND status = 'HELD'", [reservation.paymentId]);
-        await client.query("COMMIT");
-      } catch (error) {
-        await client.query("ROLLBACK");
-        throw error;
-      } finally {
-        client.release();
+  try {
+    const response = await executeExpectedPayment({
+      endpoint: extractUrl,
+      amount: selected.offer.amount,
+      asset: "0.0.0",
+      network: "hedera:testnet",
+      recipient: selected.metadata.recipient,
+      payerAccountId,
+      payerPrivateKey,
+      requestId
+    }, fixtureBytes, "image/png", {
+      onSigned: async (transactionId) => {
+        await pool.query(`
+          UPDATE payments SET status = 'SUBMITTING', transaction_reference = $2, submitted_at = now(), updated_at = now()
+          WHERE id = $1 AND status = 'RESERVED'
+        `, [reservation.paymentId, transactionId]);
+      },
+      onSettled: async (settlement) => {
+        const client = await pool.connect();
+        try {
+          await client.query("BEGIN");
+          await client.query(`
+            UPDATE payments SET status = 'SETTLED', transaction_reference = $2, settled_at = now(), updated_at = now()
+            WHERE id = $1 AND status IN ('SUBMITTING', 'UNKNOWN')
+          `, [reservation.paymentId, settlement.transaction]);
+          await client.query("UPDATE budget_reservations SET status = 'CONSUMED' WHERE payment_id = $1 AND status = 'HELD'", [reservation.paymentId]);
+          await client.query("COMMIT");
+        } catch (error) {
+          await client.query("ROLLBACK");
+          throw error;
+        } finally {
+          client.release();
+        }
+      },
+      onAmbiguous: async () => {
+        await pool.query("UPDATE payments SET status = 'UNKNOWN', updated_at = now() WHERE id = $1 AND status IN ('RESERVED', 'SUBMITTING')", [reservation.paymentId]);
       }
-    },
-    onAmbiguous: async () => {
-      await pool.query("UPDATE payments SET status = 'UNKNOWN', updated_at = now() WHERE id = $1 AND status IN ('RESERVED', 'SUBMITTING')", [reservation.paymentId]);
+    });
+    if (!response.ok) throw new Error(`paid endpoint returned HTTP ${response.status}`);
+    const result = z.object({
+      ok: z.literal(true),
+      provider: z.enum(["alpha", "beta"]),
+      requestId: z.string().nullable(),
+      extraction: invoiceExtractionSchema
+    }).parse(await response.json());
+    await pool.query(`
+      UPDATE requests
+      SET execution_status = 'SUCCEEDED', result = $2, error = NULL, updated_at = now()
+      WHERE id = $1 AND execution_status IN ('NOT_STARTED', 'RUNNING')
+    `, [requestId, JSON.stringify(result.extraction)]);
+    jsonLog({ mode: "pay", requestId, selected: selected.metadata.name, extraction: result.extraction });
+  } catch (error) {
+    const payment = await pool.query<{ status: string }>("SELECT status FROM payments WHERE id = $1", [reservation.paymentId]);
+    if (payment.rows[0]?.status === "SETTLED") {
+      await pool.query(`
+        UPDATE requests
+        SET execution_status = 'FAILED', error = $2, updated_at = now()
+        WHERE id = $1 AND execution_status <> 'SUCCEEDED'
+      `, [requestId, JSON.stringify({ code: "PAID_EXTRACTION_FAILED" })]);
     }
-  });
-  if (!response.ok) throw new Error(`paid endpoint returned HTTP ${response.status}`);
-  const result = z.object({
-    ok: z.literal(true),
-    provider: z.enum(["alpha", "beta"]),
-    requestId: z.string().nullable(),
-    extraction: invoiceExtractionSchema
-  }).parse(await response.json());
-  await pool.query(`
-    UPDATE requests
-    SET execution_status = 'SUCCEEDED', result = $2, error = NULL, updated_at = now()
-    WHERE id = $1 AND execution_status IN ('NOT_STARTED', 'RUNNING')
-  `, [requestId, JSON.stringify(result.extraction)]);
-  jsonLog({ mode: "pay", requestId, selected: selected.metadata.name, extraction: result.extraction });
+    throw error;
+  }
 } finally {
   await pool.end();
 }

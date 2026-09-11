@@ -29,7 +29,7 @@ AgentPay is an AI service router. Give the agent an invoice and a spending limit
 
 > 🌐 ENS identifies → 🧭 AgentPay selects → 💸 Blocky402 settles on Hedera → 📄 Service returns the result
 
-**Implementation status: Day 1 scaffold, September 11, 2026.** The Node 22 npm workspace, shared schemas/policy, Express and Next.js shells, PostgreSQL migration, synthetic fixture, ENS read/setup scripts, strict x402 route/client, Gemini 2.5 Flash extraction adapter, and readiness commands now exist. Offline verification is recorded in `HISTORY.md`. The configured Supabase connection, Sepolia RPC, and Blocky402 capability endpoint passed readiness checks, migration `001_initial.sql` is applied to the configured Supabase database, and the previous proof-only backend is live at `https://agentpay-api-sbwi.onrender.com`. The real extraction changes in the current checkout are not deployed or live-tested yet. The ENSv2 hierarchy through `alpha.ocr.agentpayapp.eth` is live on Sepolia; its application records are not written yet. Account balances/signing, transaction-level persistence behavior, Gemini quota/output, and paid Hedera settlement remain unverified and must not be represented as complete until their authorized testnet evidence is recorded.
+**Implementation status: Day 1 scaffold, September 11, 2026.** The Node 22 npm workspace, shared schemas/policy, Express and Next.js shells, PostgreSQL migration, synthetic fixture, ENS read/setup scripts, strict x402 route/client, Gemini extraction adapter, and readiness commands now exist. Offline verification is recorded in `HISTORY.md`. The configured Supabase connection, Sepolia RPC, Blocky402 capability endpoint, Gemini model metadata, and Hedera testnet account identities passed read-only readiness checks; migration `001_initial.sql` is applied to the configured Supabase database, and the backend is live at `https://agentpay-api-sbwi.onrender.com`. Alpha's seven application records resolve from `alpha.ocr.agentpayapp.eth`. The first authorized x402 request settled exactly `1000000` tinybars to Alpha on Hedera Testnet, but the deployed Gemini 2.5 Flash route returned HTTP 500 because Google no longer makes that model available to new API users. The local adapter and deployment configuration now target Gemini 3.6 Flash and pass offline plus metadata checks, but are not redeployed or invoked yet. Treat the request as paid-but-failed; do not retry or claim the complete journey until the original request is recovered.
 
 **Scope decision:** target ENS and Hedera only. The Graph, subgraphs, cross-chain receipt contracts, and on-chain reputation scoring are deferred. Application history is stored in a database.
 
@@ -465,10 +465,10 @@ PROVIDER_ALLOWED_ORIGINS=http://localhost:4000
 # Gemini Developer API adapters; keep the AI Studio key server-side
 AGENT_MODEL_BASE_URL=https://generativelanguage.googleapis.com/v1beta
 AGENT_MODEL_API_KEY=REPLACE_WITH_GEMINI_API_KEY
-AGENT_MODEL_ID=gemini-2.5-flash
+AGENT_MODEL_ID=gemini-3.6-flash
 EXTRACTION_MODEL_BASE_URL=https://generativelanguage.googleapis.com/v1beta
 EXTRACTION_MODEL_API_KEY=REPLACE_WITH_GEMINI_API_KEY
-EXTRACTION_MODEL_ID=gemini-2.5-flash
+EXTRACTION_MODEL_ID=gemini-3.6-flash
 
 # Server policy; client requests cannot raise these caps
 MAX_SPEND_PER_REQUEST_TINYBARS=5000000

@@ -40,7 +40,7 @@ export async function executeExpectedPayment(
   }
   const signer = createClientHederaSigner(
     expected.payerAccountId,
-    PrivateKey.fromString(expected.payerPrivateKey),
+    PrivateKey.fromStringECDSA(expected.payerPrivateKey),
     { network: "hedera:testnet" }
   );
   let signedAttemptPersisted = false;

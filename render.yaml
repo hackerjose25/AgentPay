@@ -50,13 +50,13 @@ services:
       - key: AGENT_MODEL_API_KEY
         sync: false
       - key: AGENT_MODEL_ID
-        value: gemini-2.5-flash
+        value: gemini-3.6-flash
       - key: EXTRACTION_MODEL_BASE_URL
         value: https://generativelanguage.googleapis.com/v1beta
       - key: EXTRACTION_MODEL_API_KEY
         sync: false
       - key: EXTRACTION_MODEL_ID
-        value: gemini-2.5-flash
+        value: gemini-3.6-flash
       - key: MAX_SPEND_PER_REQUEST_TINYBARS
         value: "5000000"
       - key: MAX_SPEND_PER_TASK_TINYBARS
