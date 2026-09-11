@@ -22,4 +22,8 @@ dl { margin: 0; display: grid; gap: 1px; background: #26394d; }
 dl div { display: grid; grid-template-columns: minmax(120px, .65fr) 1.35fr; gap: 16px; padding: 12px; background: #0d1825; }
 dd { margin: 0; overflow-wrap: anywhere; }
 pre { overflow: auto; padding: 16px; border-radius: 8px; background: #07111d; color: #bfe8d9; font-size: .875rem; }
+.qr-panel { display: flex; align-items: center; gap: 20px; margin-top: 20px; padding: 18px; border: 1px solid #3a4e63; border-radius: 10px; background: #f7fbff; color: #07111d; }
+.qr-panel svg { flex: 0 0 auto; max-width: 46%; height: auto; }
+.qr-panel strong { display: block; margin-bottom: 8px; }
+.qr-panel p { margin: 0; line-height: 1.5; }
 @media (max-width: 560px) { main { padding-top: 28px; } header { align-items: flex-start; flex-direction: column; } section { padding: 18px; } dl div { grid-template-columns: 1fr; gap: 4px; } .actions button { width: 100%; } }

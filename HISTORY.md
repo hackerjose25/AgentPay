@@ -617,3 +617,102 @@ Correction to `20260911T041309Z-root-render-blueprint-guidance`: `render.yaml` d
 - Verification: `npm run db:migrate` exited successfully, reporting `001_initial.sql` already applied and `002_browser_runs.sql` applied. A separate read-only query confirmed `migration_recorded = true`, `table_exists = true`, and `index_exists = true` for `002_browser_runs.sql`, `public.run_inputs`, and `public.run_inputs_expiry_idx`. `git diff --check` is run after this entry.
 - External side effects: One owner-authorized schema migration on the configured Supabase PostgreSQL database plus one read-only verification query. The migration created one table, one index, and one schema-ledger row; it did not delete or rewrite existing data. No deployment, Git commit/push, ENS write, model inference, wallet signature, Hedera transaction, or payment occurred.
 - Outcome / next step: The database prerequisite for the browser backend is satisfied. The local changes are ready for the owner to review, commit, and push; Render can then redeploy them.
+
+### 20260911T122809Z-root-local-frontend-run-guidance — Document how to run the browser harness locally
+
+- Recorded at: 2026-09-11 12:28:09 UTC.
+- Agent: Codex primary agent (`/root`).
+- Task: Give the owner the exact commands and expectations for accessing the locally developed frontend and testing the workflow.
+- Actions: Re-read the latest history and inspected the actual root, server, and web scripts plus the browser integration contract. Confirmed that one root development command launches both services, that local browser security requires explicit development Origin/API-base overrides, and that the current UI intentionally depends on an injected `window.agentPayWallet` implementation for the paid browser step.
+- Files: Appended this entry to `HISTORY.md`; no application, environment, database, dependency, or deployment file changed.
+- Verification: Confirmed the web development script binds port 3000, the server development script uses the configured port 4000 by default, the root development script launches both, and `NEXT_PUBLIC_API_BASE_URL` is the only browser-exposed configuration. No service or test was run in this documentation-only milestone.
+- External side effects: None. No database query/mutation, deployment, network request, wallet connection, model inference, signature, or payment occurred.
+- Outcome / next step: The owner can run the local session and read-only routing interface immediately. The end-to-end browser payment cannot yet be truthfully tested until the chosen prebuilt UI supplies a concrete Hedera Testnet wallet adapter; the already proven CLI path remains separate.
+
+### 20260911T155847Z-root-local-dev-env-diagnosis — Diagnose missing runtime configuration during local development
+
+- Recorded at: 2026-09-11 15:58:47 UTC.
+- Agent: Codex primary agent (`/root`).
+- Task: Inspect the owner's pasted `npm ci` and `npm run dev` output and identify why the backend did not start.
+- Actions: Read the supplied terminal transcript as diagnostic evidence, re-read the latest project history, and inspected the actual server configuration loader and workspace scripts. Confirmed that dependency installation completed and that the backend failure is unrelated to the npm audit/deprecation warnings. Identified that npm starts the server workspace with `apps/server` as its working directory while `config.ts` resolves `.env` from `process.cwd()`, so it looks for `apps/server/.env` rather than the existing repository-root `.env`; consequently all validated runtime values were undefined. Also observed that the web server itself reached port 3000 successfully and that the server watcher remained waiting after its startup failure.
+- Files: Appended this entry to `HISTORY.md`; no application, dependency, environment, database, or deployment file changed. The owner's Next development run changed generated `apps/web/next-env.d.ts`; that user-generated change was left untouched.
+- Verification: The transcript reports 631 packages installed and the web app ready in 504 ms. It reports every backend runtime key as undefined or coerced `NaN`. `apps/server/src/config.ts` explicitly loads `resolve(process.cwd(), ".env")`, and the server workspace script is invoked through npm workspaces, confirming the path mismatch. No service, test, or external integration was invoked during this diagnosis.
+- External side effects: None beyond this append-only history record. No database query/mutation, deployment, network request, wallet connection, model inference, signature, or payment occurred.
+- Outcome / next step: Stop the current watcher with Ctrl+C. Either launch the root scripts through Node 22's `--env-file=.env` so both child processes inherit the root configuration, or authorize a small code fix that resolves the root `.env` relative to the server module instead of the workspace current directory.
+
+### 20260911T163357Z-root-demo-code-location-guidance — Identify the local demo access-code source safely
+
+- Recorded at: 2026-09-11 16:33:57 UTC.
+- Agent: Codex primary agent (`/root`).
+- Task: Tell the owner where to obtain the demo access code used by the local browser harness.
+- Actions: Explained that the access code is the private `DEMO_ACCESS_CODE` value in the repository-root `.env` and provided a local terminal command for the owner to display it directly without copying it into chat.
+- Files: Appended this entry to `HISTORY.md`; no application, environment, dependency, database, or deployment file changed, and the `.env` value was not read or exposed.
+- Verification: Re-read the latest history. No runtime command or test was needed.
+- External side effects: None. No secret was printed, database accessed, deployment changed, wallet connected, model invoked, transaction signed, or payment made.
+- Outcome / next step: The owner can retrieve the value locally and enter it into the Demo access field. If it is missing or still a placeholder, replace it locally with a random value of at least 12 characters and keep `.env` uncommitted.
+
+### 20260911T163846Z-root-next-browser-milestone-guidance — Identify the next browser-workflow milestone
+
+- Recorded at: 2026-09-11 16:38:46 UTC.
+- Agent: Codex primary agent (`/root`).
+- Task: Explain the next part after starting and unlocking the local frontend.
+- Actions: Re-read the latest history and current working-tree status. Identified the immediate sequencing: permanently correct root `.env` discovery, verify session and read-only route preview locally, then implement the concrete Hedera Testnet wallet adapter behind the existing UI-neutral hook before attempting a paid browser test.
+- Files: Appended this entry to `HISTORY.md`; no application, environment, dependency, database, or deployment file changed. The generated `apps/web/next-env.d.ts` modification remains untouched.
+- Verification: Current status contains only this append-only history work and the user's generated Next environment declaration change. No service, test, or external integration was run.
+- External side effects: None. No database access, deployment, wallet connection, model inference, signature, transaction, or payment occurred.
+- Outcome / next step: Fix the environment loader first, then choose and implement the wallet SDK adapter. Only after its offline signature/term checks pass should the owner authorize one bounded browser payment smoke test.
+
+### 20260911T165208Z-root-mobile-metamask-compatibility-gate — Verify QR wallet compatibility and fix local environment loading
+
+- Recorded at: 2026-09-11 16:52:08 UTC.
+- Agent: Codex primary agent (`/root`).
+- Task: Begin the requested single-option QR wallet connection for mobile MetaMask while adhering to the native Hedera x402 payment invariants.
+- Actions: Re-read the project and web-app instructions, applied the Sites existing-project workflow in portable mode, and checked the installed x402 Hedera signer contract plus current MetaMask, Reown, Hedera, and HashPack documentation. Confirmed that a WalletConnect QR can connect MetaMask Mobile only through its EVM namespace, whereas the installed Blocky402 Hedera exact scheme constructs and validates a native Hedera `TransferTransaction`. Confirmed that MetaMask's interoperability mechanism for non-EVM protocols is Snaps and that MetaMask currently limits Snaps to the browser extension, excluding MetaMask Mobile. Stopped before adding an incompatible QR dependency or weakening payment validation. Independently fixed the previously diagnosed local startup defect by resolving `.env` relative to the server module/repository instead of the workspace current directory, and added a regression test.
+- Files: Updated `apps/server/src/config.ts`; added `apps/server/src/config-path.test.ts`; appended this entry to `HISTORY.md`. The user-generated `apps/web/next-env.d.ts` change remains untouched. No wallet/UI dependency or payment protocol code changed.
+- Verification: The Sites execution-profile check returned portable with no project reconfiguration. `npm run lint` passed, the focused environment-path test passed 1 file/1 test, `npm run typecheck` passed, and the server production build passed. Importing the built server config from `apps/server` reported `workspace env load: ok`, proving the root `.env` is now found from the formerly failing workspace directory. `git diff --check` passed before this history append.
+- External side effects: Read-only access to official/current technical documentation and local build/test activity. No package installation, QR session, wallet connection, private-key access, database operation, deployment, model inference, signature, Hedera transaction, or payment occurred.
+- Outcome / next step: The ordinary root `npm run dev` startup defect is fixed. Wallet development is blocked on a product choice: use one QR option with a Hedera-native mobile wallet such as HashPack and preserve non-custodial native x402 signing, or use MetaMask Mobile QR only for EVM identity/login and change payment execution back to the server-funded Hedera account. Implementing MetaMask Mobile as though it could sign the current native x402 payload would create a misleading, nonfunctional flow.
+
+### 20260911T165633Z-root-hashpack-qr-flow-detail — Detail the native Hedera mobile-wallet option
+
+- Recorded at: 2026-09-11 16:56:33 UTC.
+- Agent: Codex primary agent (`/root`).
+- Task: Explain in more detail the recommended single-QR HashPack flow before implementation.
+- Actions: Mapped the user-visible pairing and payment-approval sequence onto the existing browser API and `window.agentPayWallet` boundary. Rechecked the current official Hedera WalletConnect package documentation and confirmed that it supports a QR connection plus `hedera_signTransaction`, which signs a native Hedera transaction without submitting it and therefore fits the Blocky402 facilitator/co-signing lifecycle. Identified the required Reown project identifier, Hedera Testnet account/funding prerequisite, server-owned policy checks, client-owned key boundary, and rejection/timeout behavior. Clarified that the UI can expose only one branded HashPack connection action even though the underlying WalletConnect pairing protocol may be understood by other compatible Hedera wallets.
+- Files: Appended this entry to `HISTORY.md`; no application, dependency, environment, database, or deployment file changed.
+- Verification: Read-only inspection of the official `hashgraph/hedera-wallet-connect` repository documentation confirmed separate sign-only and sign-and-execute methods and recommends AppKit for new integrations. No local runtime test was appropriate because the adapter has not yet been implemented.
+- External side effects: Read-only web documentation access and this append-only history update. No package installation, wallet session, private-key access, database operation, deployment, model inference, signature, Hedera transaction, or payment occurred.
+- Outcome / next step: Implement one `Connect HashPack` QR path using Hedera-native WalletConnect and the sign-only transaction method, then test connection, network/account validation, term mutation rejection, user rejection, and expiry offline before requesting authorization for one bounded paid browser smoke test.
+
+### 20260911T165706Z-root-hashpack-flow-contract-confirmation — Confirm existing browser hook alignment
+
+- Recorded at: 2026-09-11 16:57:06 UTC.
+- Agent: Codex primary agent (`/root`).
+- Task: Confirm that the detailed HashPack proposal matches the implemented browser contract before handoff.
+- Actions: Inspected the browser integration guide, web client types, browser flow, and API wiring for the wallet hook and payment intent.
+- Files: Appended this entry to `HISTORY.md`; no application or configuration file changed.
+- Verification: Confirmed that the current contract obtains a Hedera `0.0.x` payer account, passes only the server-issued `paymentRequired` object into `createPaymentSignature`, and submits one returned x402 v2 `PAYMENT-SIGNATURE` value for exact backend revalidation.
+- External side effects: None beyond this append-only history update.
+- Outcome / next step: The native Hedera WalletConnect adapter can be added behind the existing hook without changing the backend API or coupling the future prebuilt UI to backend internals.
+
+### 20260911T180132Z-root-hashpack-qr-wallet — Implement the single-option HashPack mobile wallet flow
+
+- Recorded at: 2026-09-11 18:01:32 UTC.
+- Agent: Codex primary agent (`/root`).
+- Task: Implement option 1: a single QR-based HashPack mobile connection that signs native Hedera Testnet x402 payments while preserving the UI-neutral backend and minimal harness.
+- Actions: Re-read the project/history and web-app instructions, used the Sites existing-project workflow in portable mode, read the installed Next.js client-component/environment/third-party guidance, and inspected the current x402 Hedera signer and official Hedera WalletConnect APIs. Installed pinned project-local Hedera WalletConnect, Hiero, Reown peer, x402 client, and QR-rendering dependencies without any system-wide installation. Added a lazy client-only HashPack adapter that requests only `hedera:testnet`, `hedera_signTransaction`, and account/chain events; emits the pairing URI to an in-page QR; accepts only a HashPack peer; resumes only a HashPack Testnet session; and disconnects on logout. Added a standards-based browser payment builder that validates one exact x402 v2 upfront native-HBAR option, constructs the facilitator-fee-payer transaction, delegates sign-only approval to HashPack, and returns the encoded `PAYMENT-SIGNATURE` without submitting from the wallet. Updated the minimal UI, replacement hook, environment template, README, and integration guide. Added an intent-expiry guard before signing and an offline transaction/header regression suite.
+- Files: Added `apps/web/lib/hashpack-wallet.ts`, `apps/web/lib/hedera-wallet-payment.ts`, and `apps/web/lib/hedera-wallet-payment.test.ts`; updated `apps/web/app/page.tsx`, `apps/web/app/styles.css`, `apps/web/lib/agentpay.ts`, `apps/web/package.json`, `package-lock.json`, `.env.example`, `docs/browser-integration.md`, and `README.md`; appended this entry to `HISTORY.md`. Preserved the earlier server environment-path fix/test and the user-generated `apps/web/next-env.d.ts` change.
+- Verification: The Sites profile check returned portable/configured false. The focused wallet-payment suite passed 1 file/5 tests. Final `npm run lint`, `npm run typecheck`, all 17 offline test files/37 tests, `npm run build`, and `git diff --check` passed. The production Next build compiled and statically generated `/`. A clean `npm ci` first failed because the sandbox denied the esbuild postinstall binary with `EPERM`; the approved rerun passed and installed 908 packages from the lockfile. The first full test run was likewise blocked by sandbox `listen EPERM`; the approved rerun passed. `npm run test:e2e` reached Playwright but could not launch because its Chromium binary is not installed; no browser or OS package was installed merely to satisfy the check. An attempted set of audit-only transitive overrides produced an invalid dependency tree and was fully removed before the clean install and final checks. Final production `npm audit --omit=dev --json` reports 24 advisories (7 low, 4 moderate, 12 high, 1 critical); the advertised automatic fixes conflict with or downgrade the official pinned Hedera/x402 stack, so no unsafe force-fix was applied.
+- External side effects: Read-only access to official Reown/Hedera documentation and npm advisory metadata, project-local npm package downloads, local builds/tests, and this append-only history update. No system-wide installation, Reown project creation, wallet session, private-key access, database operation, deployment, model inference, ENS write, Hedera submission, or HBAR payment occurred.
+- Outcome / next step: The repository now contains the complete single-option HashPack QR adapter and exact browser-signing path behind the existing replaceable hook. The owner must create/configure a Reown project, add its public ID to the web build environment, install/import and fund the intended Hedera Testnet payer in HashPack mobile, restart/deploy the web app, align the backend `WEB_ORIGIN`, and manually verify QR pairing. One bounded paid browser smoke test still requires explicit authorization after the displayed provider, recipient, amount, and Testnet network are reviewed. The unresolved upstream dependency advisories remain a documented prototype limitation that should be revisited when compatible patched Hedera packages are published.
+
+### 20260911T181143Z-root-local-reown-preview — Configure the Reown project and launch the local wallet preview
+
+- Recorded at: 2026-09-11 18:11:43 UTC.
+- Agent: Codex primary agent (`/root`).
+- Task: Apply the owner's Reown project ID to the local HashPack QR integration and start the localhost web/API stack for browser testing.
+- Actions: Re-read the latest project history, applied the Sites portable-preview workflow, confirmed the repository-root backend environment permits `http://localhost:3000`, and created the ignored web-local environment with the local API base URL and the supplied public Reown project ID (`97e1…a1da`). Started the existing root development command in a retained terminal session and opened the local page in the Codex browser panel.
+- Files: Added ignored local runtime file `apps/web/.env.local`; appended this entry to `HISTORY.md`. No tracked application, dependency, database, or deployment file changed in this task.
+- Verification: Next.js 16.3.4 reported ready at `http://localhost:3000` with `.env.local` loaded. A request to `/` returned HTTP 200 and compiled successfully. `http://127.0.0.1:4000/health` returned `status: ok`, `network: hedera:testnet`, and `ensChainId: 11155111`. The retained `npm run dev` session remains active for owner testing.
+- External side effects: Started local development listeners on ports 3000 and 4000 and queued the localhost page in the user-facing browser panel. No wallet connection, account access, signature request, ENS write, database mutation, model inference, transaction submission, or payment occurred.
+- Outcome / next step: Local Reown configuration and preview startup are complete. The owner can unlock the demo, preview a synthetic invoice, select `Connect HashPack`, scan the QR with the funded Hedera Testnet HashPack account, and verify that the displayed payer is a `0.0.x` Testnet account. A paid `Sign and execute` smoke test remains intentionally unperformed pending explicit authorization after reviewing the quote.

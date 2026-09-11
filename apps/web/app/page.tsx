@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { QRCodeSVG } from "qrcode.react";
 import { AgentPayApi, type RoutePreview, type RunView } from "../lib/agentpay";
 
 const task = "Extract the invoice fields";
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000";
+const walletConnectProjectId = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID ?? "";
 
 export default function Home() {
   const api = useMemo(() => new AgentPayApi(apiBaseUrl), []);
@@ -13,6 +15,8 @@ export default function Home() {
   const [budget, setBudget] = useState("5000000");
   const [invoice, setInvoice] = useState<File | null>(null);
   const [payerAccountId, setPayerAccountId] = useState<string | null>(null);
+  const [pairingUri, setPairingUri] = useState<string | null>(null);
+  const [walletReady, setWalletReady] = useState(false);
   const [preview, setPreview] = useState<RoutePreview | null>(null);
   const [run, setRun] = useState<RunView | null>(null);
   const [busy, setBusy] = useState(false);
@@ -27,6 +31,21 @@ export default function Home() {
       })
       .catch(() => setMessage("Backend is unavailable."));
   }, [api]);
+
+  useEffect(() => {
+    if (!walletConnectProjectId) return;
+    let active = true;
+    void import("../lib/hashpack-wallet")
+      .then(({ installHashPackWallet }) => {
+        if (!active) return;
+        installHashPackWallet({ projectId: walletConnectProjectId, origin: window.location.origin });
+        setWalletReady(true);
+      })
+      .catch((error: unknown) => {
+        if (active) setMessage(error instanceof Error ? error.message : "HashPack wallet setup failed.");
+      });
+    return () => { active = false; };
+  }, []);
 
   async function runAction(action: () => Promise<void>): Promise<void> {
     setBusy(true);
@@ -71,10 +90,15 @@ export default function Home() {
 
   function connectWallet(): void {
     void runAction(async () => {
-      if (!window.agentPayWallet) throw new Error("No Hedera wallet adapter is installed. The prebuilt UI must provide window.agentPayWallet.");
-      const wallet = await window.agentPayWallet.connect();
-      setPayerAccountId(wallet.accountId);
-      setMessage(`Wallet connected: ${wallet.accountId}`);
+      if (!window.agentPayWallet) throw new Error("HashPack QR is not configured. Add NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID and restart the web app.");
+      setMessage("Scan the QR code with HashPack mobile, then approve the Testnet connection.");
+      try {
+        const wallet = await window.agentPayWallet.connect({ onPairingUri: setPairingUri });
+        setPayerAccountId(wallet.accountId);
+        setMessage(`HashPack connected: ${wallet.accountId}`);
+      } finally {
+        setPairingUri(null);
+      }
     });
   }
 
@@ -90,6 +114,7 @@ export default function Home() {
   function signAndExecute(): void {
     void runAction(async () => {
       if (!run?.paymentRequired || !window.agentPayWallet) throw new Error("Wallet adapter or payment requirements are unavailable.");
+      if (new Date(run.expiresAt).getTime() <= Date.now()) throw new Error("This payment intent expired. Cancel it and create a fresh intent.");
       setMessage("Waiting for wallet approval…");
       const signature = await window.agentPayWallet.createPaymentSignature(run.paymentRequired);
       setMessage("Submitting the signed payment and waiting for settlement…");
@@ -140,6 +165,7 @@ export default function Home() {
   function logout(): void {
     void runAction(async () => {
       await api.logout();
+      await window.agentPayWallet?.disconnect?.();
       setAuthenticated(false);
       setPreview(null);
       setRun(null);
@@ -192,9 +218,15 @@ export default function Home() {
                 <div><dt>Readiness</dt><dd>{preview.readiness[0]?.attempts ?? 0} attempt(s)</dd></div>
               </dl>
               <div className="actions">
-                <button type="button" onClick={connectWallet} disabled={busy}>{payerAccountId ? "Wallet connected" : "Connect Hedera wallet"}</button>
+                <button type="button" onClick={connectWallet} disabled={busy || !walletReady}>{payerAccountId ? "HashPack connected" : walletReady ? "Connect HashPack" : "HashPack setup required"}</button>
                 <button type="button" onClick={createPaymentIntent} disabled={busy || !payerAccountId}>Create payment intent</button>
               </div>
+              {pairingUri && (
+                <div className="qr-panel" role="dialog" aria-label="Connect HashPack">
+                  <QRCodeSVG value={pairingUri} size={232} marginSize={2} title="HashPack WalletConnect pairing code" />
+                  <div><strong>Scan with HashPack mobile</strong><p>Open HashPack, choose WalletConnect, and scan this code. Approve Hedera Testnet only.</p></div>
+                </div>
+              )}
             </section>
           )}
 

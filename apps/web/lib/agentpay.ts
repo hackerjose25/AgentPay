@@ -35,8 +35,13 @@ export interface RunView {
 }
 
 export interface HederaBrowserWalletAdapter {
-  connect(): Promise<{ accountId: string }>;
+  connect(options?: WalletConnectionOptions): Promise<{ accountId: string }>;
   createPaymentSignature(paymentRequired: unknown): Promise<string>;
+  disconnect?(): Promise<void>;
+}
+
+export interface WalletConnectionOptions {
+  onPairingUri?(uri: string): void;
 }
 
 declare global {

@@ -1,8 +1,9 @@
 import { config as loadDotenv } from "dotenv";
-import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { z } from "zod";
 
-loadDotenv({ path: resolve(process.cwd(), ".env"), quiet: true });
+export const runtimeEnvPath = fileURLToPath(new URL("../../../.env", import.meta.url));
+loadDotenv({ path: runtimeEnvPath, quiet: true });
 
 const placeholderPattern = /(?:REPLACE_ME|YOUR_|USER:PASSWORD|CHANGE_ME)/i;
 const nonPlaceholder = z.string().min(1).refine((value) => !placeholderPattern.test(value), "placeholder value is not allowed");
