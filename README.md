@@ -29,7 +29,7 @@ AgentPay is an AI service router. Give the agent an invoice and a spending limit
 
 > 🌐 ENS identifies → 🧭 AgentPay selects → 💸 Blocky402 settles on Hedera → 📄 Service returns the result
 
-**Implementation status: Day 1 scaffold, September 11, 2026.** The Node 22 npm workspace, shared schemas/policy, Express and Next.js shells, PostgreSQL migration, synthetic fixtures, ENS read/setup scripts, strict x402 route/client, Gemini extraction adapter, and readiness commands now exist. Offline verification is recorded in `HISTORY.md`. The configured Supabase connection, Sepolia RPC, Blocky402 capability endpoint, Gemini model metadata, and Hedera testnet account identities passed read-only readiness checks; migration `001_initial.sql` is applied to the configured Supabase database, and the Gemini 3.6 Flash backend is live at `https://agentpay-api-sbwi.onrender.com`. Alpha's seven application records resolve from `alpha.ocr.agentpayapp.eth`. After recovering the first payment from a retired-model failure without charging again, a second fresh invoice completed the direct live path on its first attempt: ENS selected Alpha, x402 settled exactly `1000000` tinybars on Hedera Testnet, Gemini 3.6 returned all six expected fields exactly, and Supabase durably records the request as successful. A deployed browser journey, payer-authenticated public recovery route, and second Beta provider remain later milestones.
+**Implementation status: Day 1 browser backend, September 11, 2026.** The Node 22 npm workspace, shared schemas/policy, Express and Next.js apps, PostgreSQL migrations, synthetic fixtures, ENS read/setup scripts, strict x402 route/client, Gemini extraction adapter, readiness commands, and the browser-facing session/run API now exist. The browser API supports pre-payment readiness, durable image retention, atomic budget reservation, externally supplied wallet signatures, status, cancellation, Hedera Mirror Node reconciliation, and authenticated no-second-payment extraction recovery. The included web app is intentionally a minimal integration harness; a prebuilt UI can replace it through `apps/web/lib/agentpay.ts`. Migrations `001_initial.sql` and `002_browser_runs.sql` are applied to the configured Supabase database. Offline verification is recorded in `HISTORY.md`. The Gemini 3.6 Flash backend is live at `https://agentpay-api-sbwi.onrender.com`, Alpha resolves from `alpha.ocr.agentpayapp.eth`, and the CLI path has already completed a real ENS → x402 → Hedera → Gemini extraction with exact fixture output. Deploying and testing the browser-wallet journey and adding the second Beta provider remain later milestones.
 
 **Scope decision:** target ENS and Hedera only. The Graph, subgraphs, cross-chain receipt contracts, and on-chain reputation scoring are deferred. Application history is stored in a database.
 
@@ -349,24 +349,30 @@ AgentPay/
 
 ## 🔌 API contract
 
-These routes are proposed and must be implemented. Use JSON errors shaped as `{ code, message, requestId, retryable }`, without secrets or private stack traces.
+The implemented browser and provider routes use JSON errors shaped as `{ code, message, requestId, retryable }`, without secrets or private stack traces. See `docs/browser-integration.md` for the replacement-UI contract.
 
 | Route | Purpose | Spending behavior |
 |---|---|---|
 | `GET /health` | Process liveness; no secrets | None |
+| `POST /api/session` | Validate the demo access code and issue a signed, short-lived HttpOnly session | None |
+| `GET /api/session` | Restore session and CSRF state | None |
+| `DELETE /api/session` | Close the current session | None |
 | `GET /api/services` | Directory entries plus validated live ENS metadata | None |
 | `POST /api/route` | Preview eligible candidates and selection | None |
-| `POST /api/runs` | Start bounded task execution with `Idempotency-Key` | Can create one approved payment |
+| `POST /api/runs` | Persist the image and atomically reserve budget with `Idempotency-Key` | None; creates an unsigned payment intent only |
 | `GET /api/runs/:id` | Session-scoped status, trace, and result | None; never restarts payment |
+| `POST /api/runs/:id/execute` | Validate and forward one wallet-signed x402 payload | May settle the one reserved payment |
+| `POST /api/runs/:id/cancel` | Release an unsigned reservation | None |
+| `POST /api/runs/:id/reconcile` | Check an ambiguous original transaction on Hedera Mirror Node | None; never signs or resubmits |
+| `POST /api/runs/:id/recover` | Retry extraction for an authenticated settled run with no result | None; one model call, never a new payment |
 | `GET /providers/:id/offer` | Public capability, current price, network, asset, recipient | None |
 | `POST /providers/:id/extract` | x402-gated raw PNG/JPEG extraction returning the validated invoice schema | Requires a valid payment for a new request; request `Content-Type` must match the actual image |
-| `POST /providers/:id/recover` | Recover a paid request with payer-bound authentication | None; never creates a new payment |
 
 Implement upload handling inside the run API: accept one PNG/JPEG, validate actual file type and dimensions, cap encoded/decoded size, and compute a canonical hash. Do not accept arbitrary remote image URLs in the MVP. Offer requests do not receive the invoice; only the selected execution service receives it.
 
-Run creation uses multipart fields `task`, `maxSpendTinybars`, and `invoice`. The backend generates the run/request IDs. The session-scoped idempotency key maps retries to the existing run; reuse with changed content returns `409`.
+Run creation uses multipart fields `task`, `maxSpendTinybars`, `payerAccountId`, and `invoice`. The backend generates the run/request IDs. The session-scoped idempotency key maps retries to the existing run; reuse with changed content returns `409`.
 
-The provider recovery route must verify a fresh, expiring signed challenge tied to the original payer and request, or an equivalent narrowly scoped recovery credential issued during the authenticated paid flow. It must not grant access from a public transaction ID alone.
+The run recovery route uses the signed HttpOnly session that created the run as its narrowly scoped recovery credential, requires CSRF and exact browser origin checks, verifies the same session owns the run, and accepts only a settled payment with a consumed reservation and missing result. It must not grant access from a public transaction ID alone.
 
 For the hosted demo, keep the read-only landing/trace view public and gate access to the team-funded agent with a server-validated demo access code and a short-lived session. Enforce rate limits, allowed browser origins, session ownership, and global spend limits. Public x402 provider calls still require their own payment and must have bounded inference cost. This is a demo access control, not general account onboarding.
 
@@ -554,7 +560,7 @@ Build and test first. The root `render.yaml` defines the backend as a native Nod
 
 In Render, create a Blueprint from this repository. Supply every value marked `sync: false` during the initial Blueprint creation; Render does not prompt for newly added `sync: false` values on later syncs. Copy values from the private runtime `.env`, never from `.env.ens-setup`, and do not commit them. Use the eventual Vercel HTTPS origin for `WEB_ORIGIN`. For the first backend boot, set `PROVIDER_ALLOWED_ORIGINS` to an explicit temporary HTTPS origin; as soon as Render assigns the service URL, replace it with that exact origin and redeploy before publishing ENS endpoint records. Render supplies `PORT`, and the Blueprint generates a separate production `SESSION_SECRET`.
 
-Do not add the optional model-adapter variables until real extraction is implemented; they are not consumed by the current Day 1 payment-path server. Continue using the existing Supabase `DATABASE_URL`; the Blueprint does not create or replace the database. Configure only `NEXT_PUBLIC_API_BASE_URL` with the deployed Render HTTPS origin on Vercel. Update ENS endpoint records only after the backend URL and allowlist agree, then rerun the deployed smoke test. Ensure the backend stays available during asynchronous judging and that redeploys preserve request/payment state.
+The Gemini model-adapter variables are required by the implemented extraction and recovery paths. Continue using the existing Supabase `DATABASE_URL`; the Blueprint does not create or replace the database. Configure only `NEXT_PUBLIC_API_BASE_URL` with the deployed Render HTTPS origin on the eventual web host. Update ENS endpoint records only after the backend URL and allowlist agree, then rerun the deployed smoke test. Ensure the backend stays available during asynchronous judging and that redeploys preserve request/payment state.
 
 Do not rely on a developer laptop's local model for the final live service unless its availability is deliberately arranged and documented. Keep a recording of a genuine successful run as evidence; it does not replace the live-service requirement.
 
