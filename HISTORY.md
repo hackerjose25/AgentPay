@@ -329,3 +329,27 @@ The entries below were reconstructed on September 9, 2026 from the visible conve
 - Verification: The first migration run reported `applied: 001_initial.sql`; the second reported `already applied: 001_initial.sql`. The live catalog contains `schema_migrations`, `providers`, `runs`, `requests`, `payments`, `budget_reservations`, and `payer_budget_locks`, with row-level security enabled on all seven tables. `npm test -- --run tests/migration.test.ts` passed 1 file/1 test, and `git diff --check` passed before this history append.
 - External side effects: Created the initial AgentPay tables, constraints, partial indexes, and migration-ledger row in the user-authorized configured Supabase database. Subsequent verification was read-only. No application rows, account changes, deployment, inference, ENS write, signature, or Hedera payment occurred.
 - Outcome / next step: The durable Day 1 schema is installed and idempotently tracked. Next, connect the repository to Render using `render.yaml`, enter the prompted production environment values, and perform the initial backend deployment. That deployment is a separate external publication and has not been authorized or performed by Codex.
+
+### 20260911T041309Z-root-render-blueprint-guidance — Provide the initial Render deployment checklist
+
+- Recorded at: 2026-09-11 04:13:09 UTC.
+- Agent: Codex primary agent (`/root`).
+- Task: Explain what the owner should select and enter in Render after pushing the repository to Git.
+- Actions: Re-read the latest project history and the committed-shape `render.yaml`, interpreted the supplied Render Dashboard screenshot as the generic service-selection screen, and checked current official Render Blueprint setup and secret-prompt behavior. Directed the owner to use New > Blueprint instead of manually creating a Web Service, link the repository/default branch, retain the root `render.yaml` path, review the generated `agentpay-api` service, and enter only the eight values declared with `sync: false`. Prepared temporary reserved HTTPS origins for the first boot and the post-deployment update procedure. Flagged that the current Blueprint omits `region`, so Render defaults to Oregon and the region cannot be changed after service creation.
+- Files: Appended this entry to `HISTORY.md`; no application, deployment manifest, environment, or database files changed.
+- Verification: Official Render documentation confirms New > Blueprint is the repository-backed setup flow, root `render.yaml` is the default path, `sync: false` values are prompted only during initial Blueprint creation, and an omitted region defaults to Oregon. No Render account state or repository contents were modified by Codex.
+- External side effects: Read-only official Render documentation requests only. No deployment, database change, ENS write, inference, signature, or payment occurred.
+- Outcome / next step: Before clicking Deploy Blueprint, the owner should decide whether Oregon is appropriate for the Supabase database location. Then deploy, verify the assigned `/health` URL, replace the temporary provider allowlist with the exact Render HTTPS origin, manually redeploy because auto-deploy is disabled, and share the service URL for the ENS endpoint configuration step.
+
+Correction to `20260911T041309Z-root-render-blueprint-guidance`: `render.yaml` declares nine, not eight, `sync: false` values. The complete list is `WEB_ORIGIN`, `DATABASE_URL`, `ENS_RPC_URL`, `HEDERA_AGENT_ACCOUNT_ID`, `HEDERA_AGENT_PRIVATE_KEY`, `ALPHA_RECIPIENT_ACCOUNT_ID`, `BETA_RECIPIENT_ACCOUNT_ID`, `PROVIDER_ALLOWED_ORIGINS`, and `DEMO_ACCESS_CODE`.
+
+### 20260911T053802Z-root-render-singapore-region — Align Render with the Supabase Seoul region
+
+- Recorded at: 2026-09-11 05:38:02 UTC.
+- Agent: Codex primary agent (`/root`).
+- Task: Select and configure the closest available Render region after the owner identified Supabase as Northeast Asia Seoul (`ap-northeast-2`).
+- Actions: Re-read the latest history and current Blueprint, checked Render's current official region list and immutability guidance, selected Singapore as Render's closest available region to Seoul, added `region: singapore` to the backend service, and synchronized the README deployment explanation.
+- Files: Updated `render.yaml` and `README.md`; appended this entry to `HISTORY.md`.
+- Verification: Python/PyYAML parsed the updated Blueprint and confirmed the service region is `singapore`; `git diff --check` passed. Official Render documentation lists Singapore as a supported service region and confirms a service region cannot be changed after creation.
+- External side effects: Read-only official Render documentation requests and local repository edits only. No Git push, Render deployment, database change, ENS write, inference, signature, or payment occurred.
+- Outcome / next step: Commit and push the updated `render.yaml` and README before creating the Blueprint. In Render, confirm the preview explicitly shows Singapore, then enter the nine prompted environment values and deploy.

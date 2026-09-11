@@ -2,6 +2,7 @@ services:
   - type: web
     name: agentpay-api
     runtime: node
+    region: singapore
     plan: free
     autoDeployTrigger: off
     buildCommand: npm ci && npm run build -w @agentpay/core && npm run build -w @agentpay/server
