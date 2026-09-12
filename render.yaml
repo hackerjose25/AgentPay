@@ -45,12 +45,6 @@ services:
         value: "2000000"
       - key: PROVIDER_ALLOWED_ORIGINS
         sync: false
-      - key: AGENT_MODEL_BASE_URL
-        value: https://generativelanguage.googleapis.com/v1beta
-      - key: AGENT_MODEL_API_KEY
-        sync: false
-      - key: AGENT_MODEL_ID
-        value: gemini-3.6-flash
       - key: EXTRACTION_MODEL_BASE_URL
         value: https://generativelanguage.googleapis.com/v1beta
       - key: EXTRACTION_MODEL_API_KEY

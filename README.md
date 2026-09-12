@@ -29,9 +29,11 @@ AgentPay is an AI service router. Give the agent an invoice and a spending limit
 
 > 🌐 ENS identifies → 🧭 AgentPay selects → 💸 Blocky402 settles on Hedera → 📄 Service returns the result
 
-**Implementation status: Day 1 browser workflow, September 11, 2026.** The Node 22 npm workspace, shared schemas/policy, Express and Next.js apps, PostgreSQL migrations, synthetic fixtures, ENS read/setup scripts, strict x402 route/client, Gemini extraction adapter, readiness commands, browser-facing session/run API, and a HashPack-only Hedera Testnet WalletConnect QR adapter now exist. The browser API supports pre-payment readiness, durable image retention, atomic budget reservation, externally supplied wallet signatures, status, cancellation, Hedera Mirror Node reconciliation, and authenticated no-second-payment extraction recovery. The included web app is intentionally a minimal integration harness; a prebuilt UI can replace it through `apps/web/lib/agentpay.ts`. Migrations `001_initial.sql` and `002_browser_runs.sql` are applied to the configured Supabase database. Offline verification is recorded in `HISTORY.md`. The Gemini 3.6 Flash backend is live at `https://agentpay-api-sbwi.onrender.com`, Alpha resolves from `alpha.ocr.agentpayapp.eth`, and the CLI path has already completed a real ENS → x402 → Hedera → Gemini extraction with exact fixture output. Deploying the web app, manually pairing HashPack, completing one authorized browser-wallet payment, and adding the second Beta provider remain later milestones.
+**Implementation status: working Alpha + Beta flow, September 12, 2026.** The Node 22 npm workspace contains a replaceable minimal Next.js console, an Express API/provider process, shared strict schemas and policy, and versioned PostgreSQL migrations. Supabase migrations `001_initial.sql` and `002_browser_runs.sql` are applied. Alpha is enrolled as `alpha.ocr.agentpayapp.eth` and Beta as `beta.ocr.agentpayapp.eth`; both resolve live ENSv2 records on Sepolia and point to the deployed Gemini 3.6 Flash provider/API at [agentpay-api-sbwi.onrender.com](https://agentpay-api-sbwi.onrender.com). The operator CLI has independently recorded a real ENS → x402 → Blocky402 → Hedera Testnet → Gemini run with exact synthetic-fixture output. The owner has also reported a successful local HashPack mobile QR payment and extraction through the browser flow; that browser transaction was not independently inspected because no transaction reference was supplied.
 
-**Scope decision:** target ENS and Hedera only. The Graph, subgraphs, cross-chain receipt contracts, and on-chain reputation scoring are deferred. Application history is stored in a database.
+The browser API now provides pre-payment readiness, durable private image retention, atomic budget reservation, session ownership, idempotency, wallet-signed execution, status, cancellation, Mirror Node reconciliation, and authenticated extraction recovery without a second payment. Reown supplies only the WalletConnect relay/project identity between the web app and HashPack mobile; HashPack keeps the key and approves the native Hedera transaction, while AgentPay validates terms and Blocky402 verifies and settles it. The frontend remains an intentionally plain integration harness whose backend hooks live in `apps/web/lib/agentpay.ts`. Frontend deployment, the ENS endpoint-only permission demonstration, the expired-input cleanup job, and the remaining failure/concurrency/restart evidence are still outstanding.
+
+**Scope decision:** the prototype integrates ENSv2 identity/discovery with Hedera Testnet settlement. Cross-chain receipt contracts, on-chain reputation scoring, and additional marketplace infrastructure are outside the current build. Application history is stored in PostgreSQL.
 
 ---
 
@@ -85,19 +87,21 @@ Sources: [event](https://ethglobal.com/events/ethonline2026), [submission guide]
 
 ### Must ship
 
-- [ ] One invoice-image task, one agent, two actual extraction services.
-- [ ] A persistent directory containing ENS names, with operator-controlled enrollment.
-- [ ] Live ENSv2 reads for capability, endpoint, payment network, and recipient.
+- [x] One invoice-image task, one agent, two actual extraction services.
+- [x] A persistent directory containing ENS names, with operator-controlled enrollment.
+- [x] Live ENSv2 reads for capability, endpoint, payment network, and recipient.
 - [ ] An ENSv2 demonstration in which an operator can update an endpoint but cannot change the recipient record.
-- [ ] Selection based on valid capability, current availability, current price, and a hard budget limit.
-- [ ] One HBAR payment path through Blocky402 on Hedera Testnet.
-- [ ] A result linked to its provider, routing explanation, and actual settlement transaction.
-- [ ] Durable request tracking, bounded retries, and duplicate-payment prevention.
+- [x] Selection based on valid capability, current availability, current price, and a hard budget limit.
+- [x] One HBAR payment path through Blocky402 on Hedera Testnet.
+- [x] A result linked to its provider, routing explanation, and actual settlement transaction through the independently recorded CLI smoke path.
+- [x] Durable request tracking, bounded retries, and duplicate-payment prevention.
 - [ ] A deployed interface and service with documented setup and failure states.
+- [ ] Retention: a general cleanup job removes expired invoice inputs and results after `RESULT_RETENTION_HOURS` while preserving unresolved payment, reservation, and accounting records.
+- [ ] Privacy: verified redaction from logs and UI of credentials, database URLs, signed payment payloads, session credentials, model credentials, and invoice content.
 
 ### Explicitly deferred
 
-The Graph, reputation scores, payment/event registries, custom settlement contracts, token launches, multi-agent negotiation, streaming payments, arbitrary wallet onboarding, workspaces, subscriptions, multiple capabilities, and a general-purpose chat platform.
+Reputation scores, payment/event registries, custom settlement contracts, token launches, multi-agent negotiation, streaming payments, arbitrary wallet onboarding, workspaces, subscriptions, multiple capabilities, and a general-purpose chat platform.
 
 The MVP needs **no custom Solidity contract**. It uses existing ENSv2 contracts through scripts and existing Hedera/x402 tooling. Add a custom contract only after an approved requirement demonstrates why it is necessary.
 
@@ -116,7 +120,7 @@ flowchart TD
     F -->|Yes| H[Select provider deterministically]
     H --> I[Selected service returns HTTP 402]
     I --> J[Validate actual quote and reserve budget]
-    J --> K[Sign payload and retry through x402 client]
+    J --> K[HashPack signs exact Hedera payload through Reown]
     K --> L[Blocky402 verifies and settles on Hedera]
     L --> M[Service extracts invoice fields]
     M --> N[Return result and settlement evidence]
@@ -127,12 +131,15 @@ flowchart TD
 
 ```mermaid
 flowchart LR
-    UI[Next.js console] --> API[Node / Express backend]
-    API --> AGENT[Agent tools + deterministic policy]
-    AGENT --> DIR[Provider directory]
-    AGENT --> ENS[ENSv2 / Sepolia]
-    AGENT --> PAY[x402 client + dedicated signer]
-    PAY --> SERVICE[Payment-gated extraction service]
+    UI[Next.js console] --> API[Express browser API]
+    UI --> REOWN[Reown WalletConnect relay]
+    REOWN <--> WALLET[HashPack mobile]
+    API --> ROUTER[Readiness + deterministic policy]
+    ROUTER --> DIR[PostgreSQL provider directory]
+    ROUTER --> ENS[ENSv2 / Sepolia]
+    WALLET --> UI
+    UI --> API
+    API --> SERVICE[x402-gated provider route]
     SERVICE --> FAC[Blocky402 facilitator]
     FAC --> HEDERA[Hedera Testnet]
     SERVICE --> MODEL[Actual extraction model]
@@ -154,20 +161,20 @@ Sepolia is used for names and permissions. Hedera is used for payments. **No ass
 
 ### Names, enumeration, and records
 
-Use a namespace controlled by the team on Sepolia. The following names are illustrative, not registered assets:
+The current Sepolia namespace is:
 
 ```text
-agentpay.eth
-└── ocr.agentpay.eth
-    ├── alpha.ocr.agentpay.eth
-    └── beta.ocr.agentpay.eth
+agentpayapp.eth
+└── ocr.agentpayapp.eth
+    ├── alpha.ocr.agentpayapp.eth  # enrolled and live
+    └── beta.ocr.agentpayapp.eth   # enrolled and live
 ```
 
-If `agentpay.eth` is unavailable, use another owned parent and set `ENS_PARENT_NAME` accordingly. A subname uses dots, such as `alpha.ocr.agentpay.eth`; `/ocr/alpha` is a URL path, not an ENS hierarchy.
+A subname uses dots, such as `alpha.ocr.agentpayapp.eth`; `/ocr/alpha` is a URL path, not an ENS hierarchy. `ENS_PARENT_NAME` is currently `agentpayapp.eth`.
 
 ENS does not provide a global “find all OCR providers” query. The operator enrolls names through a CLI. The database lists those names; the router resolves their live records before use. It must not silently substitute endpoints or recipients from a hard-coded map when ENS is unavailable.
 
-Proposed application-specific text-record schema:
+Implemented application-specific text-record schema:
 
 | Text-record key | Example value | Meaning |
 |---|---|---|
@@ -199,9 +206,9 @@ References: [ENS app guide](https://docs.ens.domains/ensv2/tutorial-app-develope
 
 ## 🧭 Routing and agent behavior
 
-The LLM interprets the task and invokes typed tools. Code enforces eligibility, chooses the provider, validates payment terms, and controls the signer. The model never receives a private key or an unrestricted transfer tool.
+The current router does not use an LLM to make payment decisions. Strict code recognizes the single supported invoice-extraction task, resolves enrolled providers, enforces eligibility and budget policy, and deterministically chooses the cheapest valid offer. Gemini is invoked only by the paid provider to extract structured invoice fields. It never receives a private key, wallet session, payment signature, or unrestricted transfer tool.
 
-Implement three tools: `discoverServices`, `selectService`, and `executePaidService`. `selectService` only previews a selection; `executePaidService` rechecks the quote and budget before spending.
+The browser boundary exposes typed discovery, preview, run, execute, reconcile, and recovery calls through `apps/web/lib/agentpay.ts`. Preview is read-only. Execute accepts only the wallet signature for the server-issued payment intent and revalidates it before forwarding the request.
 
 ### Initial policy
 
@@ -224,15 +231,22 @@ Use integer tinybars internally and decimal strings at API boundaries: **1 HBAR 
 
 ```mermaid
 sequenceDiagram
-    participant A as Agent backend
+    participant U as Browser console
+    participant W as HashPack via Reown
+    participant A as AgentPay API
     participant S as Extraction service
     participant B as Blocky402
     participant H as Hedera Testnet
     participant M as Extraction model
-    A->>S: Request with request ID
+    U->>A: Create run with invoice, payer, and budget
+    A->>S: Unsigned request with request ID
     S-->>A: HTTP 402 + payment requirements
-    Note over A: Validate terms, build and sign payment payload, reserve budget
-    A->>S: Retry same request with signed payment payload
+    Note over A: Validate terms and reserve budget
+    A-->>U: Exact payment intent
+    U->>W: Request sign-only approval
+    W-->>U: Signed native Hedera payload
+    U->>A: Execute reserved run with payment signature
+    A->>S: Forward same request with signed payment payload
     S->>B: Verify payload against requirements
     B-->>S: Verification result
     S->>B: Settle verified payment
@@ -242,6 +256,7 @@ sequenceDiagram
     S->>M: Extract invoice fields
     M-->>S: Structured result
     S-->>A: Result + settlement evidence
+    A-->>U: Stored result, route trace, and settlement evidence
 ```
 
 The facilitator submits the co-signed transfer. Do not perform a separate manual HBAR transfer and then invoke x402: that creates a second payment path.
@@ -307,19 +322,21 @@ Keep fixture images only for the demo. Do not put invoice contents on-chain. Per
 | Layer | Choice | Why |
 |---|---|---|
 | Language/runtime | TypeScript, Node.js 22 project target, npm workspaces | Shared types and a small tooling surface; verify dependency engines during scaffolding |
-| Web | Next.js, React, Tailwind CSS | One console with upload, candidates, payment trace, and result |
+| Web | Next.js 16, React 19, plain CSS | Minimal replaceable console with upload, route preview, QR pairing, payment trace, and result |
 | Backend | Express on Node | Long-running orchestration and straightforward x402 middleware |
-| Agent | Vercel AI SDK with one selected model adapter | Typed tools and structured output |
+| Routing | Strict TypeScript policy and typed API boundaries | Deterministic eligibility, cheapest-offer selection, and payment controls |
+| Extraction | Vercel AI SDK with Google provider, Gemini 3.6 Flash | Schema-validated structured invoice output after settlement |
 | ENS | ENSv2-ready viem; ENSjs only if write helpers simplify setup | Resolution and narrowly scoped administration |
 | Payment | `@x402/core`, `@x402/fetch`, `@x402/express`, `@x402/hedera` | Existing protocol implementation |
 | Hedera | SDK version compatible with the chosen x402 packages | Account/transaction tooling; Agent Kit is optional, not mandatory |
+| Browser wallet | Hedera WalletConnect, Reown relay, HashPack mobile | Non-custodial QR pairing and sign-only native Hedera approval |
 | Persistence | PostgreSQL on Supabase; `pg` and SQL migrations | Durable requests, transactions, reservations, and recovery |
 | Validation/tests | Zod, Vitest, Playwright | Boundary validation, policy tests, and one browser journey |
 | Hosting | Next.js on Vercel; Node backend/providers on Render | Matches the team's initial plan; verify runtime limits and persistence |
 
 No separate microservices are necessary initially. Host both provider routes in the same backend process, with separate provider configurations and recipients. Separate their directories in code so they can be deployed independently later. Use a durable database from the first real payment.
 
-Implemented Day 1 layout (later-day modules and routes remain governed by the contracts below):
+Current implemented layout:
 
 ```text
 AgentPay/
@@ -330,15 +347,21 @@ AgentPay/
 ├── .env.example                  # placeholders only
 ├── apps/
 │   ├── web/                      # Next.js console, port 3000
+│   │   ├── app/                  # minimal page, layout, and CSS
+│   │   └── lib/                  # replaceable API + HashPack/x402 adapters
 │   └── server/                   # Express API + provider routes, port 4000
 │       └── src/
-│           ├── agent/
-│           ├── directory/
+│           ├── auth/
+│           ├── browser/
 │           ├── ens/
-│           ├── policy/
+│           ├── extraction/
+│           ├── http/
 │           ├── payments/
-│           ├── providers/
-│           └── persistence/
+│           ├── persistence/
+│           ├── readiness/
+│           ├── recovery/
+│           ├── routing/
+│           └── security/
 ├── packages/core/                # shared schemas and pure helpers
 ├── scripts/                      # doctor, ENS setup, enrollment, smoke tests
 ├── migrations/                   # versioned, non-destructive SQL migrations
@@ -374,20 +397,19 @@ Run creation uses multipart fields `task`, `maxSpendTinybars`, `payerAccountId`,
 
 The run recovery route uses the signed HttpOnly session that created the run as its narrowly scoped recovery credential, requires CSRF and exact browser origin checks, verifies the same session owns the run, and accepts only a settled payment with a consumed reservation and missing result. It must not grant access from a public transaction ID alone.
 
-For the hosted demo, keep the read-only landing/trace view public and gate access to the team-funded agent with a server-validated demo access code and a short-lived session. Enforce rate limits, allowed browser origins, session ownership, and global spend limits. Public x402 provider calls still require their own payment and must have bounded inference cost. This is a demo access control, not general account onboarding.
+For the hosted demo, gate run creation and execution with a server-validated demo access code and a short-lived session. The browser payer remains the user's HashPack account; neither the demo code nor Reown grants custody or pays on the user's behalf. The dedicated server-funded payer is limited to the operator CLI smoke path and is never exposed to the browser. Enforce rate limits, exact browser origins, session ownership, and global spend limits. Public x402 provider calls still require their own payment and must have bounded inference cost. This is demo access control, not general account onboarding.
 
 ## 🗓️ Build timeline
 
-### Active plan: September 9–13, 2026
+### Delivery plan: September 9–13, 2026
 
-Assumption: three contributors can own parallel workstreams. Suggested roles are payments/backend, ENS/directory, and agent/UI. With one or two builders, keep the same acceptance gates and reduce UI scope first. All times below are IST; the final deadline remains the official one above.
+The foundation, Alpha ENS/provider path, real CLI settlement, browser API, and local HashPack flow are complete. The remaining critical path is frontend deployment and deployed validation, then Beta enrollment, ENS permission evidence, and the failure/concurrency checks. All times below are IST; the final deadline remains the official one above.
 
 | Date | Concrete work | Exit gate |
 |---|---|---|
-| Sep 9 — foundations | Scaffold workspaces and env validation; connect PostgreSQL; fund test accounts; prove one ENSv2 record write/read; run one Blocky402 HBAR request; fix schema and route contracts | Actual settlement reference and actual ENS read recorded; no integration remains purely assumed |
-| Sep 10 — complete first flow | Build one extraction endpoint, agent tools, durable payment/request state, budget reservation, and a minimal deployed console; enroll provider two | Deployed task → ENS → selection → payment → real result works |
-| Sep 11 — prove both tracks | Implement endpoint-only delegation and rejection of recipient edits; compare two live offers; test quote change, concurrency, recovery, and insufficient funds | Both sponsor demonstrations work; freeze features by evening |
-| Sep 12 — verification and delivery | Test a fresh setup, process restart recovery, deployed origins, result privacy, and all failure states; record a 2–4 minute demo; complete README and attribution | Submission package ready; target submission today |
+| Sep 9 — foundations | Scaffold workspaces and env validation; connect PostgreSQL; create test accounts; establish ENS and Blocky402 integration boundaries | Completed |
+| Sep 10–11 — first complete flow | Build the Alpha extraction route, deterministic routing, durable payment/request state, recovery, Render deployment, and browser signing path | Completed for the CLI; local browser completion is owner-reported |
+| Sep 12 — verification and delivery | Deploy the minimal frontend; align Vercel, Reown, and Render origins; run deployed checks; prove ENS permissions and key failure states; build the expired-input cleanup job; record retention/privacy evidence; record the demo | Beta enrolled and verified; frontend deploy + remaining evidence pending |
 | Sep 13 — buffer | Fix submission blockers only; verify video/repository/live URL and sponsor selections | Submit well before 9:30 p.m. IST; retain confirmation |
 
 The published schedule lists check-in #2 at **Sep 11, 9:29 a.m. IST**. Confirm it in the dashboard. [Event schedule](https://ethglobal.com/events/ethonline2026#schedule)
@@ -423,7 +445,7 @@ This plan is not evidence of a deadline extension. If beginning Sep 9, its final
 - An owned ENSv2 Sepolia namespace, Sepolia ETH, and any required test registrar token.
 - One dedicated Hedera Testnet payer and existing recipient accounts, funded with test HBAR.
 - A PostgreSQL database and an accessible extraction-model endpoint.
-- A model endpoint supporting the agent's typed tool calls; use environment-selected model IDs.
+- A Gemini Developer API key for the schema-validated extraction adapter.
 - Read access to Blocky402's testnet facilitator and to the Sepolia RPC.
 
 ### 2. Install after scaffolding
@@ -454,7 +476,7 @@ ENS_RPC_URL=https://YOUR_SEPOLIA_RPC
 ENS_CHAIN_ID=11155111
 ENS_PARENT_NAME=YOUR_OWNED_PARENT.eth
 
-# Payment: server-only dedicated testnet payer
+# Payment: server-only dedicated testnet payer for operator CLI smoke tests
 HEDERA_NETWORK=hedera:testnet
 HEDERA_AGENT_ACCOUNT_ID=0.0.REPLACE_ME
 HEDERA_AGENT_PRIVATE_KEY=REPLACE_WITH_TESTNET_ECDSA_KEY
@@ -468,10 +490,7 @@ ALPHA_PRICE_TINYBARS=1000000
 BETA_PRICE_TINYBARS=2000000
 PROVIDER_ALLOWED_ORIGINS=http://localhost:4000
 
-# Gemini Developer API adapters; keep the AI Studio key server-side
-AGENT_MODEL_BASE_URL=https://generativelanguage.googleapis.com/v1beta
-AGENT_MODEL_API_KEY=REPLACE_WITH_GEMINI_API_KEY
-AGENT_MODEL_ID=gemini-3.6-flash
+# Gemini Developer API extraction adapter; keep the AI Studio key server-side
 EXTRACTION_MODEL_BASE_URL=https://generativelanguage.googleapis.com/v1beta
 EXTRACTION_MODEL_API_KEY=REPLACE_WITH_GEMINI_API_KEY
 EXTRACTION_MODEL_ID=gemini-3.6-flash
@@ -487,7 +506,7 @@ DEMO_ACCESS_CODE=REPLACE_WITH_RANDOM_DEMO_CODE
 SESSION_SECRET=REPLACE_WITH_RANDOM_SECRET
 ```
 
-Implement one explicit backend/script environment loader for the root `.env`. The web app receives only `NEXT_PUBLIC_API_BASE_URL` and `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID`, set in the ignored `apps/web/.env.local` for local use or the frontend host's build environment for deployment. The Reown project ID identifies the dapp and is not a wallet secret. **Never copy backend secrets into `NEXT_PUBLIC_*`.** Pass backend secrets directly through the hosting platform in production.
+The backend and scripts use one explicit loader for the root `.env`. The web app receives only `NEXT_PUBLIC_API_BASE_URL` and `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID`, set in the ignored `apps/web/.env.local` for local use or the frontend host's build environment for deployment. Reown identifies the dapp and transports the WalletConnect pairing/session messages between the browser and HashPack; it does not hold keys, approve transactions, choose recipients or amounts, or settle payments. Its project ID is public configuration, not a wallet secret. **Never copy backend secrets into `NEXT_PUBLIC_*`.** Pass backend secrets directly through the hosting platform in production.
 
 ENS owner/operator signing keys belong in a separate local, ignored setup environment loaded only by ENS administration scripts. They must never be required by the running web app or backend. Provider receivers do not need private keys merely to receive native HBAR. Validate identifiers and reject placeholder values at startup.
 
@@ -562,7 +581,7 @@ Build and test first. The root `render.yaml` defines the backend as a native Nod
 
 In Render, create a Blueprint from this repository. Supply every value marked `sync: false` during the initial Blueprint creation; Render does not prompt for newly added `sync: false` values on later syncs. Copy values from the private runtime `.env`, never from `.env.ens-setup`, and do not commit them. Use the eventual Vercel HTTPS origin for `WEB_ORIGIN`. For the first backend boot, set `PROVIDER_ALLOWED_ORIGINS` to an explicit temporary HTTPS origin; as soon as Render assigns the service URL, replace it with that exact origin and redeploy before publishing ENS endpoint records. Render supplies `PORT`, and the Blueprint generates a separate production `SESSION_SECRET`.
 
-The Gemini model-adapter variables are required by the implemented extraction and recovery paths. Continue using the existing Supabase `DATABASE_URL`; the Blueprint does not create or replace the database. Configure `NEXT_PUBLIC_API_BASE_URL` with the deployed Render HTTPS origin and `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` with the Reown project ID on the eventual web host. Add that exact web origin to the Reown project allowlist and set the backend's `WEB_ORIGIN` to the same value. Update ENS endpoint records only after the backend URL and allowlist agree, then rerun the deployed smoke test. Ensure the backend stays available during asynchronous judging and that redeploys preserve request/payment state.
+The three `EXTRACTION_MODEL_*` variables are required by the implemented extraction and recovery paths; there is no separate runtime agent-model adapter. Continue using the existing Supabase `DATABASE_URL`; the Blueprint does not create or replace the database. Configure `NEXT_PUBLIC_API_BASE_URL` with the deployed Render HTTPS origin and `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` with the Reown project ID on the eventual web host. Add that exact web origin to the Reown project allowlist and set the backend's `WEB_ORIGIN` to the same value. Update ENS endpoint records only after the backend URL and allowlist agree, then rerun the deployed smoke test. Ensure the backend stays available during asynchronous judging and that redeploys preserve request/payment state.
 
 Do not rely on a developer laptop's local model for the final live service unless its availability is deliberately arranged and documented. Keep a recording of a genuine successful run as evidence; it does not replace the live-service requirement.
 
@@ -625,11 +644,11 @@ Before submission, fill in a verified deployment record in this repository conta
 
 ## ⚠️ Limitations and roadmap
 
-This is a controlled testnet prototype with a centrally enrolled directory and a dedicated server-side agent wallet. It is not a permissionless market or production wallet product. An ENS identity proves control of records, not service honesty or model quality. A successful transfer proves payment, not correct extraction.
+This is a controlled testnet prototype with a centrally enrolled directory. Its browser flow uses a user-controlled Hedera Testnet account in HashPack; a separate dedicated server-side payer exists only for operator CLI smoke tests. Reown relays the QR wallet session and never has custody. This is not a permissionless market or production wallet product. An ENS identity proves control of records, not service honesty or model quality. A successful transfer proves payment, not correct extraction.
 
 The database is application-owned history, not decentralized reputation. Payments and model execution are not an atomic operation: a provider can fail after settlement. The MVP supports recovery and explicit failure reporting; automatic refunds and dispute resolution are future work. Never display “refunded” without a confirmed refund transfer.
 
-Post-hackathon priorities are user-authorized session wallets, better outcome measurements, independent provider onboarding, refund policies, and additional capabilities. The Graph may be reconsidered later when a useful dataset and a supported indexing path have been demonstrated; it is not part of this submission's architecture.
+Post-hackathon priorities are better outcome measurements, independent provider onboarding, refund policies, production-grade wallet/session hardening, and additional capabilities.
 
 ## 🔗 References
 

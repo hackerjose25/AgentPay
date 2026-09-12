@@ -49,7 +49,6 @@ if (process.env.BLOCKY402_FACILITATOR_URL === "https://api.testnet.blocky402.com
 }
 
 for (const [name, urlKey, keyKey, modelKey] of [
-  ["agent-model", "AGENT_MODEL_BASE_URL", "AGENT_MODEL_API_KEY", "AGENT_MODEL_ID"],
   ["extraction-model", "EXTRACTION_MODEL_BASE_URL", "EXTRACTION_MODEL_API_KEY", "EXTRACTION_MODEL_ID"]
 ] as const) {
   if (!hasPlaceholder(process.env[urlKey]) && !hasPlaceholder(process.env[keyKey]) && !hasPlaceholder(process.env[modelKey])) {
