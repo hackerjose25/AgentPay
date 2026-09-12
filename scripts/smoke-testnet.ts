@@ -68,7 +68,7 @@ for (const name of names) {
   }
 }
 
-const selection = selectCheapestEligible(candidates, maxPerRequest, allowedOrigins);
+const selection = selectCheapestEligible(candidates, maxPerRequest, allowedOrigins, "invoice-extraction");
 if (!selection.selected) {
   jsonLog({ mode: pay ? "pay" : "dry-run", selected: null, unavailable, excluded: selection.excluded });
   throw new Error("no eligible provider is available within the configured per-request budget");

@@ -34,9 +34,9 @@ afterEach(async () => {
   })));
 });
 
-async function start(extract: () => Promise<typeof expected>): Promise<string> {
+async function start(extract: () => Promise<typeof expected>, answerQuestion?: (image: unknown, question: string) => Promise<{ answer: string }>): Promise<string> {
   const app = createApp(config, {
-    extractor: { extract },
+    extractor: { extract, answerQuestion: answerQuestion ?? (() => Promise.resolve({ answer: "The total is 118.00 USD." })) },
     paymentMiddleware: (_request, _response, next) => next()
   });
   const server = app.listen(0);
@@ -81,5 +81,45 @@ describe("provider extraction route", () => {
     expect(response.status).toBe(400);
     await expect(response.json()).resolves.toMatchObject({ code: "INVALID_IMAGE", requestId: "invalid-image-test" });
     expect(extract).not.toHaveBeenCalled();
+  });
+});
+
+describe("provider question answering route", () => {
+  it("passes a validated image and question to the extractor and returns its answer", async () => {
+    const answerQuestion = vi.fn(() => Promise.resolve({ answer: "The total is 118.00 USD." }));
+    const origin = await start(() => Promise.resolve(expected), answerQuestion);
+    const bytes = await readFile(resolve(process.cwd(), "fixtures/synthetic-invoice.png"));
+
+    const response = await fetch(`${origin}/providers/beta/qa?question=${encodeURIComponent("What is the total?")}`, {
+      method: "POST",
+      headers: { "content-type": "image/png", "x-request-id": "offline-qa-test" },
+      body: new Uint8Array(bytes)
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      ok: true,
+      provider: "beta",
+      requestId: "offline-qa-test",
+      answer: { answer: "The total is 118.00 USD." }
+    });
+    expect(answerQuestion).toHaveBeenCalledOnce();
+    expect(answerQuestion).toHaveBeenCalledWith(expect.anything(), "What is the total?");
+  });
+
+  it("rejects a missing question before calling the model adapter", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const answerQuestion = vi.fn(() => Promise.resolve({ answer: "unused" }));
+    const origin = await start(() => Promise.resolve(expected), answerQuestion);
+    const bytes = await readFile(resolve(process.cwd(), "fixtures/synthetic-invoice.png"));
+
+    const response = await fetch(`${origin}/providers/alpha/qa`, {
+      method: "POST",
+      headers: { "content-type": "image/png", "x-request-id": "missing-question-test" },
+      body: new Uint8Array(bytes)
+    });
+
+    expect(response.status).toBe(400);
+    expect(answerQuestion).not.toHaveBeenCalled();
   });
 });

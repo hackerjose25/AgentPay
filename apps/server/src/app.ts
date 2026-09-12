@@ -2,6 +2,7 @@ import cors from "cors";
 import express, { type RequestHandler } from "express";
 import multer from "multer";
 import { z } from "zod";
+import { capabilitySchema, interpretTask } from "@agentpay/core";
 import { issueSession, readCookie, secretMatches, sessionCookieName, sessionTtlSeconds, verifySession, type SessionClaims } from "./auth/session.js";
 import { BrowserFlowService } from "./browser/flow.js";
 import type { RuntimeConfig } from "./config.js";
@@ -26,7 +27,8 @@ const executeSchema = z.object({ paymentSignature: z.string().min(16).max(65_536
 const runFieldsSchema = z.object({
   task: z.string(),
   maxSpendTinybars: z.string(),
-  payerAccountId: z.string()
+  payerAccountId: z.string(),
+  question: z.string().optional()
 });
 
 function requireTrustedOrigin(config: RuntimeConfig): RequestHandler {
@@ -122,10 +124,11 @@ export function createApp(config: RuntimeConfig, dependencies: AppDependencies =
     const claims = sessionClaims(request, config);
     requireCsrf(request, claims);
     const input = previewSchema.parse(request.body);
-    if (!/invoice|extract/i.test(input.task)) throw new HttpError("UNSUPPORTED_TASK", "Only invoice extraction is supported", 400);
-    const preview = await browserFlow.preview(input.maxSpendTinybars);
+    const capability = interpretTask(input.task);
+    if (!capability) throw new HttpError("UNSUPPORTED_TASK", "Only invoice extraction and invoice question answering are supported", 400);
+    const preview = await browserFlow.preview(input.maxSpendTinybars, capability);
     response.json({
-      capability: "invoice-extraction",
+      capability,
       selected: preview.selected,
       readiness: preview.readiness,
       excluded: preview.excluded,
@@ -153,6 +156,7 @@ export function createApp(config: RuntimeConfig, dependencies: AppDependencies =
       task: fields.task,
       maxSpendTinybars: fields.maxSpendTinybars,
       payerAccountId: fields.payerAccountId,
+      ...(fields.question ? { question: fields.question } : {}),
       image: { bytes: image.bytes, mimeType: image.mimeType }
     });
     response.status(201).json(run);
@@ -193,10 +197,11 @@ export function createApp(config: RuntimeConfig, dependencies: AppDependencies =
     const isAlpha = provider === "alpha";
     const isBeta = provider === "beta";
     if (!isAlpha && !isBeta) return notFound(request, response);
+    const capability = capabilitySchema.parse(request.query.capability ?? "invoice-extraction");
     const amount = isAlpha ? config.ALPHA_PRICE_TINYBARS : config.BETA_PRICE_TINYBARS;
     const recipient = isAlpha ? config.ALPHA_RECIPIENT_ACCOUNT_ID : config.BETA_RECIPIENT_ACCOUNT_ID;
     response.json({
-      capability: "invoice-extraction",
+      capability,
       amount: amount.toString(),
       asset: "0.0.0",
       network: "hedera:testnet",
@@ -221,6 +226,23 @@ export function createApp(config: RuntimeConfig, dependencies: AppDependencies =
       provider,
       requestId: request.header("x-request-id") ?? null,
       extraction
+    });
+  });
+
+  app.post("/providers/:id/qa", async (request, response) => {
+    const provider = request.params.id;
+    if (provider !== "alpha" && provider !== "beta") return notFound(request, response);
+    const question = z.string().trim().min(1).max(500).parse(request.query.question);
+    const image = validateInvoiceImage(request.body, request.header("content-type"), {
+      maxBytes: config.MAX_INPUT_BYTES,
+      maxPixels: config.MAX_INPUT_PIXELS
+    });
+    const answer = await extractor.answerQuestion(image, question);
+    response.json({
+      ok: true,
+      provider,
+      requestId: request.header("x-request-id") ?? null,
+      answer
     });
   });
 

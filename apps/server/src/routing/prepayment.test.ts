@@ -14,7 +14,7 @@ const config = {
 const metadata = {
   name: "alpha.ocr.agentpayapp.eth",
   schema: "1" as const,
-  capability: "invoice-extraction" as const,
+  capability: "invoice-extraction,invoice-qa",
   endpoint: "https://provider.example/providers/alpha",
   network: "hedera:testnet" as const,
   asset: "0.0.0" as const,
@@ -48,13 +48,13 @@ const paymentRequired: PaymentRequired = {
 
 describe("browser pre-payment preview", () => {
   it("warms first, refreshes ENS, and accepts only matching unsigned 402 terms", async () => {
-    const fetcher = vi.fn((input: string | URL) => Promise.resolve(String(input).endsWith("/offer")
+    const fetcher = vi.fn((input: string | URL) => Promise.resolve(String(input).includes("/offer")
       ? new Response(JSON.stringify(offer), { status: 200, headers: { "content-type": "application/json" } })
       : new Response(null, { status: 402, headers: { "payment-required": encodePaymentRequiredHeader(paymentRequired) } })));
     const resolveMetadata = vi.fn(() => Promise.resolve(metadata));
     const waitUntilReady = vi.fn(() => Promise.resolve({ attempts: 2, waitedMs: 31_000 }));
 
-    const result = await createRoutePreview(config, [metadata.name], 2_000_000n, {
+    const result = await createRoutePreview(config, [metadata.name], 2_000_000n, "invoice-extraction", {
       fetcher: fetcher as typeof fetch,
       resolveMetadata,
       waitUntilReady,
@@ -70,15 +70,40 @@ describe("browser pre-payment preview", () => {
 
   it("rejects a recipient substitution in the 402 response", async () => {
     const changed = { ...paymentRequired, accepts: [{ ...paymentRequired.accepts[0]!, payTo: "0.0.9999" }] };
-    const fetcher = vi.fn((input: string | URL) => Promise.resolve(String(input).endsWith("/offer")
+    const fetcher = vi.fn((input: string | URL) => Promise.resolve(String(input).includes("/offer")
       ? new Response(JSON.stringify(offer), { status: 200, headers: { "content-type": "application/json" } })
       : new Response(null, { status: 402, headers: { "payment-required": encodePaymentRequiredHeader(changed) } })));
 
-    await expect(createRoutePreview(config, [metadata.name], 2_000_000n, {
+    await expect(createRoutePreview(config, [metadata.name], 2_000_000n, "invoice-extraction", {
       fetcher: fetcher as typeof fetch,
       resolveMetadata: () => Promise.resolve(metadata),
       waitUntilReady: () => Promise.resolve({ attempts: 1, waitedMs: 0 }),
       facilitatorSupport: () => Promise.resolve({ x402Version: 2, feePayer: "0.0.7162784" })
     })).rejects.toMatchObject({ code: "QUOTE_CHANGED" });
+  });
+
+  it("builds a /qa executeUrl when capability is invoice-qa", async () => {
+    const qaPaymentRequired: PaymentRequired = {
+      ...paymentRequired,
+      resource: { url: "https://provider.example/providers/alpha/qa" }
+    };
+    const qaOffer = { ...offer, capability: "invoice-qa" as const };
+    const fetcher = vi.fn((input: string | URL) => {
+      const url = String(input);
+      if (url.includes("/offer")) {
+        return Promise.resolve(new Response(JSON.stringify(qaOffer), { status: 200, headers: { "content-type": "application/json" } }));
+      }
+      return Promise.resolve(new Response(null, { status: 402, headers: { "payment-required": encodePaymentRequiredHeader(qaPaymentRequired) } }));
+    });
+
+    const result = await createRoutePreview(config, [metadata.name], 2_000_000n, "invoice-qa", {
+      fetcher: fetcher as typeof fetch,
+      resolveMetadata: () => Promise.resolve(metadata),
+      waitUntilReady: () => Promise.resolve({ attempts: 1, waitedMs: 0 }),
+      facilitatorSupport: () => Promise.resolve({ x402Version: 2, feePayer: "0.0.7162784" })
+    });
+
+    expect(result.executeUrl).toContain("/qa");
+    expect(result.paymentRequirement.amount).toBe("1000000");
   });
 });

@@ -37,6 +37,30 @@ export function createProviderPaymentMiddleware(config: RuntimeConfig) {
         },
         description: "AgentPay invoice extraction by provider beta",
         mimeType: "application/json"
+      },
+      "POST /providers/alpha/qa": {
+        accepts: {
+          scheme: "exact",
+          price: { asset: "0.0.0", amount: config.ALPHA_PRICE_TINYBARS.toString() },
+          network: "hedera:testnet",
+          payTo: config.ALPHA_RECIPIENT_ACCOUNT_ID,
+          maxTimeoutSeconds: 60,
+          extra: { paymentFlow: "upfront" }
+        },
+        description: "AgentPay invoice question answering by provider alpha",
+        mimeType: "application/json"
+      },
+      "POST /providers/beta/qa": {
+        accepts: {
+          scheme: "exact",
+          price: { asset: "0.0.0", amount: config.BETA_PRICE_TINYBARS.toString() },
+          network: "hedera:testnet",
+          payTo: config.BETA_RECIPIENT_ACCOUNT_ID,
+          maxTimeoutSeconds: 60,
+          extra: { paymentFlow: "upfront" }
+        },
+        description: "AgentPay invoice question answering by provider beta",
+        mimeType: "application/json"
       }
     },
     resourceServer

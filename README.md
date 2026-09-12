@@ -101,7 +101,7 @@ Sources: [event](https://ethglobal.com/events/ethonline2026), [submission guide]
 
 ### Explicitly deferred
 
-Reputation scores, payment/event registries, custom settlement contracts, token launches, multi-agent negotiation, streaming payments, arbitrary wallet onboarding, workspaces, subscriptions, multiple capabilities, and a general-purpose chat platform.
+Reputation scores, payment/event registries, custom settlement contracts, token launches, multi-agent negotiation, streaming payments, arbitrary wallet onboarding, workspaces, subscriptions, and a general-purpose chat platform.
 
 The MVP needs **no custom Solidity contract**. It uses existing ENSv2 contracts through scripts and existing Hedera/x402 tooling. Add a custom contract only after an approved requirement demonstrates why it is necessary.
 
@@ -179,7 +179,7 @@ Implemented application-specific text-record schema:
 | Text-record key | Example value | Meaning |
 |---|---|---|
 | `agentpay.schema` | `1` | Metadata schema version |
-| `agentpay.capability` | `invoice-extraction` | Supported task |
+| `agentpay.capability` | `invoice-extraction,invoice-qa` | Comma-separated supported tasks |
 | `agentpay.endpoint` | `https://provider.example/providers/alpha` | Base URL for offer and execution routes |
 | `agentpay.payment.network` | `hedera:testnet` | Accepted payment network |
 | `agentpay.payment.asset` | `0.0.0` | Native HBAR in the Hedera x402 scheme |
@@ -206,7 +206,7 @@ References: [ENS app guide](https://docs.ens.domains/ensv2/tutorial-app-develope
 
 ## 🧭 Routing and agent behavior
 
-The current router does not use an LLM to make payment decisions. Strict code recognizes the single supported invoice-extraction task, resolves enrolled providers, enforces eligibility and budget policy, and deterministically chooses the cheapest valid offer. Gemini is invoked only by the paid provider to extract structured invoice fields. It never receives a private key, wallet session, payment signature, or unrestricted transfer tool.
+The current router does not use an LLM to make payment decisions. Strict code recognizes two supported tasks — `invoice-extraction` (structured fields) and `invoice-qa` (one natural-language question about the invoice) — resolves enrolled providers, enforces eligibility and budget policy, and deterministically chooses the cheapest valid offer. Gemini is invoked only by the paid provider to extract structured invoice fields or answer a question about the invoice image. It never receives a private key, wallet session, payment signature, or unrestricted transfer tool.
 
 The browser boundary exposes typed discovery, preview, run, execute, reconcile, and recovery calls through `apps/web/lib/agentpay.ts`. Preview is read-only. Execute accepts only the wallet signature for the server-issued payment intent and revalidates it before forwarding the request.
 
@@ -409,7 +409,7 @@ The foundation, Alpha ENS/provider path, real CLI settlement, browser API, and l
 |---|---|---|
 | Sep 9 — foundations | Scaffold workspaces and env validation; connect PostgreSQL; create test accounts; establish ENS and Blocky402 integration boundaries | Completed |
 | Sep 10–11 — first complete flow | Build the Alpha extraction route, deterministic routing, durable payment/request state, recovery, Render deployment, and browser signing path | Completed for the CLI; local browser completion is owner-reported |
-| Sep 12 — verification and delivery | Deploy the minimal frontend; align Vercel, Reown, and Render origins; run deployed checks; prove ENS permissions and key failure states; build the expired-input cleanup job; record retention/privacy evidence; record the demo | Beta enrolled and verified; frontend deploy + remaining evidence pending |
+| Sep 12 — verification and delivery | Deploy the minimal frontend; align Vercel, Reown, and Render origins; run deployed checks; prove ENS permissions and key failure states; build the expired-input cleanup job; record retention/privacy evidence; record the demo | Beta enrolled and verified; invoice-QA capability implemented and tested; frontend deploy + remaining evidence pending |
 | Sep 13 — buffer | Fix submission blockers only; verify video/repository/live URL and sponsor selections | Submit well before 9:30 p.m. IST; retain confirmation |
 
 The published schedule lists check-in #2 at **Sep 11, 9:29 a.m. IST**. Confirm it in the dashboard. [Event schedule](https://ethglobal.com/events/ethonline2026#schedule)

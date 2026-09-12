@@ -5,7 +5,7 @@ export interface SessionState {
 }
 
 export interface RoutePreview {
-  capability: "invoice-extraction";
+  capability: "invoice-extraction" | "invoice-qa";
   selected: {
     metadata: { name: string; endpoint: string; recipient: string; network: string; asset: string };
     offer: { amount: string; expiresAt: string };
@@ -97,11 +97,12 @@ export class AgentPayApi {
     });
   }
 
-  createRun(input: { task: string; maxSpendTinybars: string; payerAccountId: string; invoice: File }, idempotencyKey: string): Promise<RunView> {
+  createRun(input: { task: string; maxSpendTinybars: string; payerAccountId: string; invoice: File; question?: string }, idempotencyKey: string): Promise<RunView> {
     const form = new FormData();
     form.set("task", input.task);
     form.set("maxSpendTinybars", input.maxSpendTinybars);
     form.set("payerAccountId", input.payerAccountId);
+    if (input.question) form.set("question", input.question);
     form.set("invoice", input.invoice);
     return this.request("/api/runs", {
       method: "POST",

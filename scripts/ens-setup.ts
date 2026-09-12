@@ -23,7 +23,7 @@ const resolver = await client.getEnsResolver({ name });
 if (!resolver) throw new Error(`no active resolver found for ${name}; registration/configuration must be completed first`);
 const records = [
   ["agentpay.schema", "1"],
-  ["agentpay.capability", "invoice-extraction"],
+  ["agentpay.capability", "invoice-extraction,invoice-qa"],
   ["agentpay.endpoint", endpoint.toString().replace(/\/$/, "")],
   ["agentpay.payment.network", "hedera:testnet"],
   ["agentpay.payment.asset", "0.0.0"],

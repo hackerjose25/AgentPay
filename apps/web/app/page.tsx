@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { AgentPayApi, type RoutePreview, type RunView } from "../lib/agentpay";
 
-const task = "Extract the invoice fields";
+const extractionTask = "Extract the invoice fields";
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000";
 const walletConnectProjectId = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID ?? "";
 
@@ -13,6 +13,7 @@ export default function Home() {
   const [authenticated, setAuthenticated] = useState(false);
   const [accessCode, setAccessCode] = useState("");
   const [budget, setBudget] = useState("5000000");
+  const [question, setQuestion] = useState("");
   const [invoice, setInvoice] = useState<File | null>(null);
   const [payerAccountId, setPayerAccountId] = useState<string | null>(null);
   const [pairingUri, setPairingUri] = useState<string | null>(null);
@@ -22,6 +23,7 @@ export default function Home() {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("Enter the demo access code to begin.");
   const idempotencyKey = useRef(crypto.randomUUID());
+  const task = question.trim() ? question.trim() : extractionTask;
 
   useEffect(() => {
     void api.getSession()
@@ -105,7 +107,7 @@ export default function Home() {
   function createPaymentIntent(): void {
     void runAction(async () => {
       if (!invoice || !payerAccountId) throw new Error("Connect the payer wallet and choose an invoice first.");
-      const nextRun = await api.createRun({ task, maxSpendTinybars: budget, payerAccountId, invoice }, idempotencyKey.current);
+      const nextRun = await api.createRun({ task, maxSpendTinybars: budget, payerAccountId, invoice, ...(question.trim() ? { question: question.trim() } : {}) }, idempotencyKey.current);
       setRun(nextRun);
       setMessage("Payment intent reserved. Review the exact terms before signing.");
     });
@@ -120,7 +122,7 @@ export default function Home() {
       setMessage("Submitting the signed payment and waiting for settlement…");
       const completed = await api.execute(run.runId, signature);
       setRun(completed);
-      setMessage(completed.status === "SUCCEEDED" ? "Extraction complete." : `Run status: ${completed.status}`);
+      setMessage(completed.status === "SUCCEEDED" ? "Run complete." : `Run status: ${completed.status}`);
     });
   }
 
@@ -201,6 +203,8 @@ export default function Home() {
             <form onSubmit={previewRoute}>
               <label htmlFor="invoice">Invoice image</label>
               <input id="invoice" type="file" accept="image/png,image/jpeg" onChange={(event) => setInvoice(event.target.files?.[0] ?? null)} required />
+              <label htmlFor="question">Question (optional — leave empty to extract the invoice fields)</label>
+              <textarea id="question" rows={2} maxLength={500} value={question} onChange={(event) => setQuestion(event.target.value)} placeholder="e.g. What is the total?" />
               <label htmlFor="budget">Maximum spend in tinybars</label>
               <input id="budget" inputMode="numeric" pattern="[1-9][0-9]*" value={budget} onChange={(event) => setBudget(event.target.value)} required />
               <button disabled={busy}>Preview route</button>

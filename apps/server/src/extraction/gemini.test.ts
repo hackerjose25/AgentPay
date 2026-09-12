@@ -42,4 +42,19 @@ describe("Gemini invoice extractor", () => {
 
     await expect(createGeminiInvoiceExtractor(modelConfig, generate).extract(image)).rejects.toThrow();
   });
+
+  it("answers a question with schema-validated output and includes the question", async () => {
+    const generate = vi.fn(() => Promise.resolve({ output: { answer: "The total is 118.00 USD." } })) as unknown as typeof generateText;
+    const bytes = await readFile(resolve(process.cwd(), "fixtures/synthetic-invoice.png"));
+    const image = validateInvoiceImage(bytes, "image/png", { maxBytes: 5_000_000, maxPixels: 20_000_000 });
+
+    await expect(createGeminiInvoiceExtractor(modelConfig, generate).answerQuestion(image, "What is the total?"))
+      .resolves.toEqual({ answer: "The total is 118.00 USD." });
+    expect(generate).toHaveBeenCalledOnce();
+    const request = vi.mocked(generate).mock.calls[0]?.[0];
+    const message = request?.messages?.[0];
+    if (!message || message.role !== "user" || typeof message.content === "string") throw new Error("expected user content parts");
+    expect(message.content.some((part) => part.type === "text" && part.text.includes("What is the total?"))).toBe(true);
+    expect(message.content.some((part) => part.type === "file" && part.mediaType === "image/png")).toBe(true);
+  });
 });

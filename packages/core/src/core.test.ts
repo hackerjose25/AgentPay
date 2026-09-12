@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatTinybars, parseTinybars, selectCheapestEligible, type Candidate } from "./index.js";
+import { formatTinybars, parseTinybars, parseCapabilities, interpretTask, selectCheapestEligible, type Candidate } from "./index.js";
 
 const baseCandidate: Candidate = {
   metadata: {
@@ -32,6 +32,38 @@ describe("tinybar helpers", () => {
   });
 });
 
+describe("interpretTask", () => {
+  it("maps extraction mentions to invoice-extraction", () => {
+    expect(interpretTask("Extract the invoice fields")).toBe("invoice-extraction");
+    expect(interpretTask("invoice processing")).toBe("invoice-extraction");
+  });
+
+  it("maps questions to invoice-qa", () => {
+    expect(interpretTask("What is the total?")).toBe("invoice-qa");
+    expect(interpretTask("is the tax rate 18%")).toBe("invoice-qa");
+    expect(interpretTask("How much is the subtotal")).toBe("invoice-qa");
+  });
+
+  it("returns null for empty or unsupported tasks", () => {
+    expect(interpretTask("")).toBeNull();
+    expect(interpretTask("  ")).toBeNull();
+    expect(interpretTask("weather report")).toBeNull();
+  });
+});
+
+describe("parseCapabilities", () => {
+  it("splits comma-separated capability records", () => {
+    expect(parseCapabilities("invoice-extraction")).toEqual(["invoice-extraction"]);
+    expect(parseCapabilities("invoice-extraction,invoice-qa")).toEqual(["invoice-extraction", "invoice-qa"]);
+    expect(parseCapabilities("invoice-qa,invoice-extraction")).toEqual(["invoice-qa", "invoice-extraction"]);
+  });
+
+  it("ignores unknown capabilities", () => {
+    expect(parseCapabilities("invoice-extraction,unknown")).toEqual(["invoice-extraction"]);
+    expect(parseCapabilities("something-else")).toEqual([]);
+  });
+});
+
 describe("selection policy", () => {
   it("chooses the cheapest eligible candidate with an ENS-name tie break", () => {
     const beta = structuredClone(baseCandidate);
@@ -42,6 +74,7 @@ describe("selection policy", () => {
       [beta, baseCandidate],
       5_000_000n,
       new Set(["https://provider.example"]),
+      "invoice-extraction",
       new Date("2026-09-10T12:00:00.000Z")
     );
 
@@ -59,6 +92,7 @@ describe("selection policy", () => {
       [changedRecipient, expensive],
       5_000_000n,
       new Set(["https://provider.example"]),
+      "invoice-extraction",
       new Date("2026-09-10T12:00:00.000Z")
     );
 
@@ -67,6 +101,38 @@ describe("selection policy", () => {
       "offer recipient differs from ENS",
       "over budget"
     ]);
+  });
+
+  it("excludes providers that do not advertise the requested capability", () => {
+    const qaCandidate = structuredClone(baseCandidate);
+    qaCandidate.offer.capability = "invoice-qa";
+
+    const result = selectCheapestEligible(
+      [qaCandidate],
+      5_000_000n,
+      new Set(["https://provider.example"]),
+      "invoice-extraction",
+      new Date("2026-09-10T12:00:00.000Z")
+    );
+
+    expect(result.selected).toBeNull();
+    expect(result.excluded[0]?.reason).toBe("offer capability differs from requested");
+  });
+
+  it("excludes candidates whose metadata does not list the requested capability", () => {
+    const qaOnly = structuredClone(baseCandidate);
+    qaOnly.metadata.capability = "invoice-qa";
+
+    const result = selectCheapestEligible(
+      [qaOnly],
+      5_000_000n,
+      new Set(["https://provider.example"]),
+      "invoice-extraction",
+      new Date("2026-09-10T12:00:00.000Z")
+    );
+
+    expect(result.selected).toBeNull();
+    expect(result.excluded[0]?.reason).toBe("capability not advertised");
   });
 });
 

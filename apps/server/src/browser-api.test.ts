@@ -67,7 +67,7 @@ describe("browser API contract", () => {
     const app = createApp(config, {
       browserFlow: browserFlow as never,
       paymentMiddleware: (_request, _response, next) => next(),
-      extractor: { extract: vi.fn() }
+      extractor: { extract: vi.fn(), answerQuestion: vi.fn() }
     });
     const server = app.listen(0, "127.0.0.1");
     servers.push(server);

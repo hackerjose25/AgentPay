@@ -143,7 +143,7 @@ npm run smoke:testnet -- --pay
 ## Agent and routing invariants
 
 - The LLM can understand tasks and invoke typed discovery/selection/execution tools. It cannot choose arbitrary recipients, bypass policy, write SQL, access secrets, or call an unrestricted wallet tool.
-- Interpret only one capability in the MVP: `invoice-extraction` from PNG/JPEG. Reject unsupported tasks clearly.
+- Interpret two capabilities in the MVP: `invoice-extraction` (structured fields from PNG/JPEG) and `invoice-qa` (one natural-language question about the invoice image). Reject unsupported tasks clearly.
 - Apply hard eligibility filters before scoring: capability, active state, allowed endpoint, supported network/asset, valid recipient, availability, and remaining budget.
 - Choose the cheapest eligible current offer; break ties by normalized ENS name. Do not add unmeasured quality, popularity, or reliability scores.
 - Read-only discovery and route previews never sign or spend. Paid execution revalidates its selected candidate and actual 402 requirements.

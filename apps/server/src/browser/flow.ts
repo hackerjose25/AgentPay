@@ -2,7 +2,14 @@ import { createHash, randomUUID } from "node:crypto";
 import { decodePaymentResponseHeader, decodePaymentSignatureHeader } from "@x402/core/http";
 import type { PaymentRequirements } from "@x402/core/types";
 import { HEDERA_TESTNET_MIRROR_NODE_URL, getNetForAccount, getPositiveReceivers, inspectHederaTransaction } from "@x402/hedera";
-import { hederaAccountIdSchema, invoiceExtractionSchema } from "@agentpay/core";
+import {
+  capabilitySchema,
+  hederaAccountIdSchema,
+  interpretTask,
+  invoiceAnswerSchema,
+  invoiceExtractionSchema,
+  type Capability
+} from "@agentpay/core";
 import { Pool, type PoolClient } from "pg";
 import { z } from "zod";
 import type { RuntimeConfig } from "../config.js";
@@ -15,9 +22,10 @@ import { reserveBudgetInTransaction } from "../persistence/database.js";
 import { createRoutePreview, type RoutePreview } from "../routing/prepayment.js";
 
 const taskSchema = z.string().trim().min(1).max(200).refine(
-  (task) => /invoice|extract/i.test(task),
-  "Only invoice extraction is supported"
+  (task) => interpretTask(task) !== null,
+  "Only invoice extraction and invoice question answering are supported"
 );
+const questionSchema = z.string().trim().min(1).max(500);
 const tinybarBudgetSchema = z.string().regex(/^[1-9]\d*$/).transform(BigInt);
 const idempotencyKeySchema = z.string().trim().min(8).max(128);
 const paymentSignatureSchema = z.string().min(16).max(65_536);
@@ -32,7 +40,8 @@ const paymentRequirementSchema = z.object({
   extra: z.record(z.string(), z.unknown())
 });
 const routingSnapshotSchema = z.object({
-  extractUrl: z.url(),
+  capability: capabilitySchema,
+  executeUrl: z.url(),
   paymentRequired: z.unknown(),
   paymentRequirement: paymentRequirementSchema,
   validatedAt: z.iso.datetime(),
@@ -49,6 +58,7 @@ export interface BrowserRunInput {
   maxSpendTinybars: string;
   payerAccountId: string;
   image: { bytes: Uint8Array; mimeType: "image/png" | "image/jpeg" };
+  question?: string;
 }
 
 export interface BrowserRunView {
@@ -75,6 +85,7 @@ interface RunRow {
   request_id: string;
   session_id: string;
   task: string;
+  question: string | null;
   budget_tinybars: string;
   input_hash: string;
   expires_at: Date;
@@ -163,17 +174,17 @@ export class BrowserFlowService {
     }));
   }
 
-  async preview(maxSpendTinybarsValue: string): Promise<RoutePreview> {
+  async preview(maxSpendTinybarsValue: string, capability: Capability): Promise<RoutePreview> {
     const maxSpendTinybars = tinybarBudgetSchema.parse(maxSpendTinybarsValue);
     const enrolled = await this.pool.query<{ ens_name: string }>(
       "SELECT ens_name FROM providers WHERE enrollment_status = 'ACTIVE' ORDER BY ens_name"
     );
-    return createRoutePreview(this.config, enrolled.rows.map((row) => row.ens_name), maxSpendTinybars);
+    return createRoutePreview(this.config, enrolled.rows.map((row) => row.ens_name), maxSpendTinybars, capability);
   }
 
   private async findRun(runId: string, sessionId: string): Promise<RunRow> {
     const result = await this.pool.query<RunRow>(`
-      SELECT r.id AS run_id, q.id AS request_id, r.session_id, r.task,
+      SELECT r.id AS run_id, q.id AS request_id, r.session_id, r.task, r.question,
         r.budget_tinybars::text, r.input_hash, r.expires_at, r.routing_snapshot,
         q.provider_name, q.payer_account_id, q.quote_snapshot, q.execution_status,
         q.result, q.error, q.execution_lease_owner, q.execution_lease_expires_at,
@@ -199,6 +210,16 @@ export class BrowserFlowService {
 
   async createRun(input: BrowserRunInput): Promise<BrowserRunView> {
     const task = taskSchema.parse(input.task);
+    const capability = interpretTask(task);
+    if (!capability) throw new HttpError("UNSUPPORTED_TASK", "Only invoice extraction and invoice question answering are supported", 400);
+    const question = input.question?.trim() || null;
+    if (capability === "invoice-qa" && !question) {
+      throw new HttpError("QUESTION_REQUIRED", "A question is required for invoice question answering", 400);
+    }
+    if (capability === "invoice-extraction" && question) {
+      throw new HttpError("QUESTION_NOT_ALLOWED", "A question is only allowed for invoice question answering", 400);
+    }
+    if (question) questionSchema.parse(question);
     const budgetTinybars = tinybarBudgetSchema.parse(input.maxSpendTinybars);
     const payerAccountId = hederaAccountIdSchema.parse(input.payerAccountId);
     const idempotencyKey = idempotencyKeySchema.parse(input.idempotencyKey);
@@ -206,27 +227,28 @@ export class BrowserFlowService {
       throw new HttpError("INVALID_BUDGET", "Budget exceeds the server task cap", 400);
     }
     const inputHash = createHash("sha256").update(input.image.bytes).digest("hex");
-    const existing = await this.pool.query<{ id: string; task: string; budget_tinybars: string; input_hash: string }>(
-      "SELECT id, task, budget_tinybars::text, input_hash FROM runs WHERE session_id = $1 AND idempotency_key = $2",
+    const existing = await this.pool.query<{ id: string; task: string; question: string | null; budget_tinybars: string; input_hash: string }>(
+      "SELECT id, task, question, budget_tinybars::text, input_hash FROM runs WHERE session_id = $1 AND idempotency_key = $2",
       [input.sessionId, idempotencyKey]
     );
     const prior = existing.rows[0];
     if (prior) {
-      if (prior.task !== task || prior.budget_tinybars !== budgetTinybars.toString() || prior.input_hash !== inputHash) {
+      if (prior.task !== task || prior.question !== question || prior.budget_tinybars !== budgetTinybars.toString() || prior.input_hash !== inputHash) {
         throw new HttpError("IDEMPOTENCY_CONFLICT", "This idempotency key was already used with different input", 409);
       }
       return publicRun(await this.findRun(prior.id, input.sessionId), true);
     }
 
-    const preview = await this.preview(budgetTinybars.toString());
+    const preview = await this.preview(budgetTinybars.toString(), capability);
     if (Date.now() - new Date(preview.validatedAt).getTime() > 30_000 || new Date(preview.selected.offer.expiresAt) <= new Date()) {
       throw new HttpError("QUOTE_EXPIRED", "The route preview expired before reservation", 409, true);
     }
     const runId = randomUUID();
     const requestId = randomUUID();
     const routingSnapshot = {
+      capability,
       selected: preview.selected,
-      extractUrl: preview.extractUrl,
+      executeUrl: preview.executeUrl,
       paymentRequired: preview.paymentRequired,
       paymentRequirement: preview.paymentRequirement,
       readiness: preview.readiness,
@@ -238,10 +260,10 @@ export class BrowserFlowService {
     try {
       await client.query("BEGIN");
       await client.query(`
-        INSERT INTO runs (id, session_id, idempotency_key, task, capability, budget_tinybars,
+        INSERT INTO runs (id, session_id, idempotency_key, task, capability, question, budget_tinybars,
           input_reference, input_hash, routing_snapshot, expires_at)
-        VALUES ($1, $2, $3, $4, 'invoice-extraction', $5, $6, $7, $8, $9)
-      `, [runId, input.sessionId, idempotencyKey, task, budgetTinybars.toString(), `database:run_inputs:${runId}`, inputHash, JSON.stringify(routingSnapshot), expiresAt]);
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+      `, [runId, input.sessionId, idempotencyKey, task, capability, question, budgetTinybars.toString(), `database:run_inputs:${runId}`, inputHash, JSON.stringify(routingSnapshot), expiresAt]);
       await client.query(`
         INSERT INTO requests (id, run_id, provider_name, payer_account_id, input_hash, quote_snapshot)
         VALUES ($1, $2, $3, $4, $5, $6)
@@ -269,13 +291,13 @@ export class BrowserFlowService {
         throw new HttpError("BUDGET_EXCEEDED", "The selected payment exceeds an enforced server budget", 409);
       }
       if ((error as PostgresError).code === "23505") {
-        const concurrent = await this.pool.query<{ id: string; task: string; budget_tinybars: string; input_hash: string }>(
-          "SELECT id, task, budget_tinybars::text, input_hash FROM runs WHERE session_id = $1 AND idempotency_key = $2",
+        const concurrent = await this.pool.query<{ id: string; task: string; question: string | null; budget_tinybars: string; input_hash: string }>(
+          "SELECT id, task, question, budget_tinybars::text, input_hash FROM runs WHERE session_id = $1 AND idempotency_key = $2",
           [input.sessionId, idempotencyKey]
         );
         const concurrentRun = concurrent.rows[0];
         if (concurrentRun) {
-          if (concurrentRun.task !== task || concurrentRun.budget_tinybars !== budgetTinybars.toString() || concurrentRun.input_hash !== inputHash) {
+          if (concurrentRun.task !== task || concurrentRun.question !== question || concurrentRun.budget_tinybars !== budgetTinybars.toString() || concurrentRun.input_hash !== inputHash) {
             throw new HttpError("IDEMPOTENCY_CONFLICT", "This idempotency key was already used with different input", 409);
           }
           return publicRun(await this.findRun(concurrentRun.id, input.sessionId), true);
@@ -348,7 +370,12 @@ export class BrowserFlowService {
 
     let response: Response;
     try {
-      response = await fetch(snapshot.extractUrl, {
+      const executeUrl = new URL(snapshot.executeUrl);
+      if (snapshot.capability === "invoice-qa") {
+        if (!initial.question) throw new HttpError("QUESTION_REQUIRED", "The retained question is no longer available", 410);
+        executeUrl.searchParams.set("question", initial.question);
+      }
+      response = await fetch(executeUrl, {
         method: "POST",
         headers: {
           "content-type": initial.mime_type,
@@ -401,11 +428,17 @@ export class BrowserFlowService {
       throw new HttpError("PAYMENT_FAILED", "The facilitator rejected the payment", 402);
     }
 
-    let extraction: unknown;
+    let result: unknown;
     try {
-      const body = z.object({ ok: z.literal(true), extraction: invoiceExtractionSchema }).parse(await response.json());
-      if (!response.ok) throw new Error("provider failed after settlement");
-      extraction = body.extraction;
+      if (snapshot.capability === "invoice-qa") {
+        const body = z.object({ ok: z.literal(true), answer: invoiceAnswerSchema.shape.answer }).parse(await response.json());
+        if (!response.ok) throw new Error("provider failed after settlement");
+        result = { answer: body.answer };
+      } else {
+        const body = z.object({ ok: z.literal(true), extraction: invoiceExtractionSchema }).parse(await response.json());
+        if (!response.ok) throw new Error("provider failed after settlement");
+        result = body.extraction;
+      }
     } catch {
       await this.markSettled(initial.payment_id, settlement.transaction);
       await this.pool.query(`
@@ -413,7 +446,7 @@ export class BrowserFlowService {
           execution_lease_owner = NULL, execution_lease_expires_at = NULL, updated_at = now()
         WHERE id = $1 AND execution_lease_owner = $3
       `, [initial.request_id, JSON.stringify({ code: "PAID_EXTRACTION_FAILED" }), leaseOwner]);
-      throw new HttpError("PAID_EXTRACTION_FAILED", "Payment settled but extraction failed; recover this run without paying again", 502, true);
+      throw new HttpError("PAID_EXTRACTION_FAILED", "Payment settled but the provider failed; recover this run without paying again", 502, true);
     }
 
     const client = await this.pool.connect();
@@ -424,7 +457,7 @@ export class BrowserFlowService {
         UPDATE requests SET execution_status = 'SUCCEEDED', result = $2, error = NULL,
           execution_lease_owner = NULL, execution_lease_expires_at = NULL, updated_at = now()
         WHERE id = $1 AND execution_lease_owner = $3 AND execution_status = 'RUNNING'
-      `, [initial.request_id, JSON.stringify(extraction), leaseOwner]);
+      `, [initial.request_id, JSON.stringify(result), leaseOwner]);
       if (completed.rowCount !== 1) throw new Error("execution lease was lost");
       await client.query("COMMIT");
     } catch (error) {
@@ -528,12 +561,15 @@ export class BrowserFlowService {
         maxBytes: this.config.MAX_INPUT_BYTES,
         maxPixels: this.config.MAX_INPUT_PIXELS
       });
-      const extraction = await this.extractor.extract(image);
+      const snapshot = routingSnapshotSchema.parse(row.routing_snapshot);
+      const result = snapshot.capability === "invoice-qa"
+        ? { answer: (await this.extractor.answerQuestion(image, row.question ?? "")).answer }
+        : await this.extractor.extract(image);
       const completed = await this.pool.query(`
         UPDATE requests SET execution_status = 'SUCCEEDED', result = $3, error = NULL,
           execution_lease_owner = NULL, execution_lease_expires_at = NULL, updated_at = now()
         WHERE id = $1 AND execution_lease_owner = $2 AND execution_status = 'RUNNING'
-      `, [row.request_id, leaseOwner, JSON.stringify(extraction)]);
+      `, [row.request_id, leaseOwner, JSON.stringify(result)]);
       if (completed.rowCount !== 1) throw new Error("recovery lease was lost");
     } catch {
       await this.pool.query(`
@@ -541,7 +577,7 @@ export class BrowserFlowService {
           execution_lease_owner = NULL, execution_lease_expires_at = NULL, updated_at = now()
         WHERE id = $1 AND execution_lease_owner = $2 AND execution_status = 'RUNNING'
       `, [row.request_id, leaseOwner, JSON.stringify({ code: "RECOVERY_EXTRACTION_FAILED" })]);
-      throw new HttpError("RECOVERY_EXTRACTION_FAILED", "Recovery extraction failed; no new payment was made", 502, true);
+      throw new HttpError("RECOVERY_EXTRACTION_FAILED", "Recovery failed; no new payment was made", 502, true);
     }
     return publicRun(await this.findRun(runId, sessionId));
   }

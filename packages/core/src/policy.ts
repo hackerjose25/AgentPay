@@ -1,5 +1,5 @@
 import { parseTinybars } from "./amounts.js";
-import type { ProviderMetadata, ProviderOffer } from "./schemas.js";
+import { parseCapabilities, type Capability, type ProviderMetadata, type ProviderOffer } from "./schemas.js";
 
 export interface Candidate {
   metadata: ProviderMetadata;
@@ -15,6 +15,7 @@ export function selectCheapestEligible(
   candidates: readonly Candidate[],
   remainingBudgetTinybars: bigint,
   allowedOrigins: ReadonlySet<string>,
+  capability: Capability,
   now = new Date()
 ): SelectionResult {
   const eligible: Candidate[] = [];
@@ -24,7 +25,9 @@ export function selectCheapestEligible(
     const { metadata, offer } = candidate;
     let reason: string | null = null;
 
-    if (!metadata.active || !offer.available) reason = "unavailable";
+    if (!parseCapabilities(metadata.capability).includes(capability)) reason = "capability not advertised";
+    else if (offer.capability !== capability) reason = "offer capability differs from requested";
+    else if (!metadata.active || !offer.available) reason = "unavailable";
     else if (!allowedOrigins.has(new URL(metadata.endpoint).origin)) reason = "endpoint origin is not allowed";
     else if (metadata.network !== offer.network || metadata.asset !== offer.asset) reason = "offer network or asset differs from ENS";
     else if (metadata.recipient !== offer.recipient) reason = "offer recipient differs from ENS";

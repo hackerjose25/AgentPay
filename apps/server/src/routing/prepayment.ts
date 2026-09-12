@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { decodePaymentRequiredHeader } from "@x402/core/http";
 import type { PaymentRequired, PaymentRequirements } from "@x402/core/types";
-import { providerOfferSchema, selectCheapestEligible, type Candidate } from "@agentpay/core";
+import { providerOfferSchema, selectCheapestEligible, type Candidate, type Capability } from "@agentpay/core";
 import type { RuntimeConfig } from "../config.js";
 import { resolveProviderMetadata } from "../ens/resolver.js";
 import { HttpError } from "../http/errors.js";
@@ -11,7 +11,7 @@ import { validateServiceEndpoint } from "../security/endpoints.js";
 
 export interface RoutePreview {
   selected: Candidate;
-  extractUrl: string;
+  executeUrl: string;
   paymentRequired: PaymentRequired;
   paymentRequirement: PaymentRequirements;
   readiness: Array<{ name: string; attempts: number; waitedMs: number }>;
@@ -41,6 +41,7 @@ export async function createRoutePreview(
   config: RuntimeConfig,
   providerNames: readonly string[],
   maxSpendTinybars: bigint,
+  capability: Capability,
   dependencies: PreviewDependencies = {}
 ): Promise<RoutePreview> {
   if (maxSpendTinybars <= 0n || maxSpendTinybars > config.MAX_SPEND_PER_REQUEST_TINYBARS) {
@@ -75,6 +76,7 @@ export async function createRoutePreview(
       if (!stableEndpoint || !wakeResult) throw new Error("provider endpoint changed during readiness");
       const base = validateServiceEndpoint(metadata.endpoint, allowedOrigins, config.NODE_ENV === "development");
       const offerUrl = new URL(`${base.pathname.replace(/\/$/, "")}/offer`, base.origin);
+      offerUrl.searchParams.set("capability", capability);
       const offerResponse = await fetcher(offerUrl, { redirect: "error", signal: AbortSignal.timeout(30_000) });
       if (!offerResponse.ok) throw new Error("provider offer unavailable");
       candidates.push({ metadata, offer: providerOfferSchema.parse(await offerResponse.json()) });
@@ -84,18 +86,19 @@ export async function createRoutePreview(
     }
   }
 
-  const selection = selectCheapestEligible(candidates, maxSpendTinybars, allowedOrigins);
+  const selection = selectCheapestEligible(candidates, maxSpendTinybars, allowedOrigins, capability);
   if (!selection.selected) {
     throw new HttpError("NO_ELIGIBLE_PROVIDER", "No eligible provider is currently available within this budget", 422, true);
   }
   const selected = selection.selected;
   const providerBase = new URL(selected.metadata.endpoint);
-  const extractUrl = new URL(`${providerBase.pathname.replace(/\/$/, "")}/extract`, providerBase.origin);
-  validateServiceEndpoint(extractUrl.toString(), allowedOrigins, config.NODE_ENV === "development");
+  const executePath = capability === "invoice-qa" ? "/qa" : "/extract";
+  const executeUrl = new URL(`${providerBase.pathname.replace(/\/$/, "")}${executePath}`, providerBase.origin);
+  validateServiceEndpoint(executeUrl.toString(), allowedOrigins, config.NODE_ENV === "development");
 
   const [support, paymentResponse] = await Promise.all([
     facilitatorSupport(config.BLOCKY402_FACILITATOR_URL, fetcher),
-    fetcher(extractUrl, {
+    fetcher(executeUrl, {
       method: "POST",
       headers: { "content-type": "application/json", "x-request-id": randomUUID() },
       body: JSON.stringify({ proof: "browser-prepayment-readiness" }),
@@ -116,7 +119,7 @@ export async function createRoutePreview(
 
   return {
     selected,
-    extractUrl: extractUrl.toString(),
+    executeUrl: executeUrl.toString(),
     paymentRequired,
     paymentRequirement,
     readiness,
