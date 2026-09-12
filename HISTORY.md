@@ -716,3 +716,47 @@ Correction to `20260911T041309Z-root-render-blueprint-guidance`: `render.yaml` d
 - Verification: Next.js 16.3.4 reported ready at `http://localhost:3000` with `.env.local` loaded. A request to `/` returned HTTP 200 and compiled successfully. `http://127.0.0.1:4000/health` returned `status: ok`, `network: hedera:testnet`, and `ensChainId: 11155111`. The retained `npm run dev` session remains active for owner testing.
 - External side effects: Started local development listeners on ports 3000 and 4000 and queued the localhost page in the user-facing browser panel. No wallet connection, account access, signature request, ENS write, database mutation, model inference, transaction submission, or payment occurred.
 - Outcome / next step: Local Reown configuration and preview startup are complete. The owner can unlock the demo, preview a synthetic invoice, select `Connect HashPack`, scan the QR with the funded Hedera Testnet HashPack account, and verify that the displayed payer is a `0.0.x` Testnet account. A paid `Sign and execute` smoke test remains intentionally unperformed pending explicit authorization after reviewing the quote.
+
+### 20260911T182310Z-root-sign-button-triage — Triage the reported HashPack sign-and-execute failure
+
+- Recorded at: 2026-09-11 18:23:10 UTC.
+- Agent: Codex primary agent (`/root`).
+- Task: Diagnose the owner's report that QR pairing succeeds but `Sign and execute` does not work.
+- Actions: Inspected the retained local server/browser output, the button enablement and action path, the HashPack adapter, the x402 Hedera payment builder, the installed Hedera WalletConnect 2.1.3 implementation/types, and the x402 Hedera 2.25.0 reference signer. Checked current upstream Hedera WalletConnect documentation and relevant known issues. Confirmed that the code intentionally requests `hedera_signTransaction` and does not submit from the wallet, matching the Blocky402 fee-payer flow; switching to `hedera_signAndExecuteTransaction` would violate the current settlement design. Attempted a read-only query of recent run states to distinguish pre-signing from post-submission failure: the first attempt used the wrong module path, and the corrected query was blocked by the Supabase certificate chain while strict TLS verification was retained.
+- Files: Appended this entry to `HISTORY.md`; no application, dependency, environment, database, or deployment file changed.
+- Verification: The retained development session remains active. Its latest output shows only successful page loads and WalletConnect/Lit development warnings, with no process failure. Static inspection confirms `Sign and execute` is enabled only while the run payment is `RESERVED`; after a click it first changes the page status to `Waiting for wallet approval…`, then requests the HashPack signature, and contacts the backend only after a signature returns. Installed and current upstream code confirm `DAppSigner.signTransaction` sends `hedera_signTransaction` without executing. No exact wallet rejection or browser status was available in the server output.
+- External side effects: Read-only official documentation access, local code/runtime inspection, and attempted read-only database connections. The TLS-failed database attempts made no mutation. No wallet action was initiated, no private key or invoice was read, and no signature, ENS write, model inference, transaction, or payment occurred.
+- Outcome / next step: Precise correction depends on one observable from the owner's browser: whether the button is grey/disabled, or whether clicking changes the status to `Waiting for wallet approval…` and then hangs/errors. Obtain that displayed state/error before changing the protocol path; keep the current reserved payment unsigned and do not retry payment submission.
+
+### 20260911T183113Z-root-reown-role-and-success-record — Record the successful browser payment and explain Reown's role
+
+- Recorded at: 2026-09-11 18:31:13 UTC.
+- Agent: Codex primary agent (`/root`).
+- Task: Record the owner's successful end-to-end browser result and explain why the Reown project is required.
+- Actions: Re-read the latest history, accepted the owner's report that the payment completed and an extraction result was returned, and mapped Reown to its narrow role as the WalletConnect relay/project identity used between the browser and HashPack mobile. Distinguished that transport role from AgentPay policy/orchestration, HashPack key custody and approval, x402 payment formatting, Blocky402 verification/fee-payer settlement, Hedera consensus, ENS discovery, and Gemini extraction.
+- Files: Appended this entry to `HISTORY.md`; no application, environment, dependency, database, or deployment file changed.
+- Verification: User-reported live outcome only: QR pairing, payment, and result retrieval succeeded. No transaction reference or result contents were requested or independently verified in this task.
+- External side effects: The owner reports a completed Hedera Testnet payment and model-backed extraction in the prior browser session. This explanatory task performed no wallet action, signature, payment, model call, database mutation, or other external write.
+- Outcome / next step: The prior signing concern is resolved by the successful end-to-end run. Keep the Reown project ID as public frontend configuration because removing it breaks QR session creation and wallet messaging; it is not a wallet secret, payment processor, custody service, or source of HBAR.
+
+### 20260911T183504Z-root-readme-reown-audit — Check README coverage of Reown
+
+- Recorded at: 2026-09-11 18:35:04 UTC.
+- Agent: Codex primary agent (`/root`).
+- Task: Determine whether the README already explains Reown's role in the browser-wallet flow.
+- Actions: Searched `README.md` for Reown, WalletConnect, HashPack, and the public project-ID variable and compared the wording with the previously explained component responsibilities.
+- Files: Appended this entry to `HISTORY.md`; no application, README, environment, dependency, database, or deployment file changed.
+- Verification: README lines 490, 551, and 565 document the public Reown project ID, local/hosted configuration, origin allowlisting, and HashPack QR usage. The README says the ID identifies the dapp and is not a wallet secret, but it does not yet explicitly explain that Reown provides the WalletConnect relay/session transport and does not custody funds, sign, set payment terms, or settle Hedera transactions. The implementation-status paragraph also still describes a successful browser payment as pending, which is now stale relative to the owner's report.
+- External side effects: None beyond this append-only history entry. No network, wallet, database, deployment, model, or payment action occurred.
+- Outcome / next step: Reown setup is documented, but the fuller role explanation and successful browser-smoke status are not yet synchronized into README. Update those two documentation areas if the owner authorizes the edit.
+
+### 20260911T183644Z-root-next-development-stage — Identify the next development and deployment stage
+
+- Recorded at: 2026-09-11 18:36:44 UTC.
+- Agent: Codex primary agent (`/root`).
+- Task: Determine whether frontend deployment to Vercel is the next project stage after the successful local browser-wallet flow.
+- Actions: Re-read the latest history, the active build timeline, hosting architecture, deployment instructions, and current working-tree status. Compared completed local/live-backend milestones against the remaining acceptance gates.
+- Files: Appended this entry to `HISTORY.md`; no application, README, environment, dependency, database, or deployment file changed.
+- Verification: The repository declares Vercel as the Next.js frontend target and Render as the existing backend target. The owner has reported a successful local browser-wallet payment and result, while the README still identifies frontend deployment and a deployed end-to-end test as outstanding. The second Beta provider and broader recovery/failure verification also remain subsequent gates. Current tracked status before this append contained only the existing `HISTORY.md` modification.
+- External side effects: None beyond this append-only history entry. No Vercel project, deployment, DNS/origin setting, wallet action, payment, model call, or database change occurred.
+- Outcome / next step: Yes—first synchronize the README/evidence, then deploy `apps/web` to Vercel with only the two public frontend variables. After Vercel assigns its HTTPS origin, add it to Reown's allowlist and set Render `WEB_ORIGIN` to it, redeploy the backend if needed, perform read-only deployed checks, and only then authorize one bounded deployed paid smoke test. After that gate, implement/enroll Beta and run the remaining permission, concurrency, quote-change, recovery, and failure-state verification.
