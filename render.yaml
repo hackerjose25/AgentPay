@@ -4,7 +4,7 @@ services:
     runtime: node
     region: singapore
     plan: free
-    autoDeployTrigger: off
+    autoDeployTrigger: on
     buildCommand: npm ci --include=dev && npm run build -w @agentpay/core && npm run build -w @agentpay/server
     startCommand: npm run start -w @agentpay/server
     healthCheckPath: /health
