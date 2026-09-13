@@ -16,10 +16,10 @@ export interface RunContextType {
   services: ProviderService[];
   routePreview: RoutePreview | null;
   activeRun: RunView | null;
-  activeStep: number; // 0 to 8
   isRunning: boolean;
   isCompleted: boolean;
   error: string | null;
+  message: string | null;
   selectedFile: File | null;
   taskCapability: 'invoice-extraction' | 'invoice-qa';
   prompt: string;
@@ -31,22 +31,26 @@ export interface RunContextType {
   setQuestion: (q: string) => void;
   setBudgetHbar: (budget: string) => void;
   unlockSession: (code: string) => Promise<void>;
-  runAgentFlow: (file?: File) => Promise<void>;
+  previewRoute: () => Promise<void>;
+  createPaymentIntent: () => Promise<void>;
+  signAndExecute: () => Promise<void>;
   cancelActiveRun: () => Promise<void>;
   reconcileActiveRun: () => Promise<void>;
   recoverActiveRun: () => Promise<void>;
+  refreshRunState: () => Promise<void>;
   refreshServices: () => Promise<void>;
+  logoutSession: () => Promise<void>;
 }
 
 const RunContext = createContext<RunContextType | undefined>(undefined);
 
-// Helper to generate a clean synthetic invoice PNG image file
-async function getSyntheticInvoiceFile(): Promise<File> {
+// Helper to generate a synthetic invoice PNG image file if user does not upload one
+export async function getSyntheticInvoiceFile(): Promise<File> {
   const svgContent = `<svg xmlns="http://www.w3.org/2000/svg" width="600" height="800" viewBox="0 0 600 800" fill="none">
     <rect width="600" height="800" fill="#ffffff"/>
     <text x="40" y="60" font-family="monospace" font-size="24" font-weight="bold" fill="#111827">INVOICE #INV-2026-0912</text>
     <text x="40" y="100" font-family="sans-serif" font-size="14" fill="#4B5563">Vendor: Meridian Labs GmbH</text>
-    <text x="40" y="120" font-family="sans-serif" font-size="14" fill="#4B5563">Client: AgentPay Research</text>
+    <text x="40" y="120" font-family="sans-serif" font-size="14" fill="#4B5563">Client: AegisPay Research</text>
     <text x="40" y="140" font-family="sans-serif" font-size="14" fill="#4B5563">Date: 2026-09-12</text>
     <line x1="40" y1="170" x2="560" y2="170" stroke="#E5E7EB" stroke-width="2"/>
     <text x="40" y="210" font-family="sans-serif" font-size="14" font-weight="bold" fill="#111827">Description</text>
@@ -92,41 +96,60 @@ async function getSyntheticInvoiceFile(): Promise<File> {
 }
 
 export function RunProvider({ children }: { children: React.ReactNode }) {
-  const { address, createPaymentSignature } = useWallet();
+  const { address, createPaymentSignature, disconnect } = useWallet();
   const [api] = useState(() => new AgentPayApi());
 
   const [session, setSession] = useState<SessionState | null>(null);
   const [services, setServices] = useState<ProviderService[]>([]);
   const [routePreview, setRoutePreview] = useState<RoutePreview | null>(null);
   const [activeRun, setActiveRun] = useState<RunView | null>(null);
-  const [activeStep, setActiveStep] = useState<number>(0);
   const [isRunning, setIsRunning] = useState(false);
   const [isCompleted, setIsCompleted] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
 
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [taskCapability, setTaskCapability] = useState<'invoice-extraction' | 'invoice-qa'>('invoice-extraction');
   const [prompt, setPrompt] = useState('Extract text and total due from this invoice');
   const [question, setQuestion] = useState('What is the total amount due on this invoice?');
   const [budgetHbar, setBudgetHbar] = useState('0.05');
 
   const unlockSession = useCallback(async (code: string) => {
+    setError(null);
     try {
       const sess = await api.unlock(code);
       setSession(sess);
+      setMessage("Session active.");
     } catch (err: unknown) {
-      console.warn("Session unlock error:", err);
+      const msg = err instanceof Error ? err.message : String(err);
+      setError(`Unlock error: ${msg}`);
+      throw err;
     }
   }, [api]);
+
+  const logoutSession = useCallback(async () => {
+    setError(null);
+    try {
+      await api.logout();
+      disconnect();
+      setSession(null);
+      setRoutePreview(null);
+      setActiveRun(null);
+      setMessage("Session closed.");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setError(`Logout error: ${msg}`);
+    }
+  }, [api, disconnect]);
 
   const refreshServices = useCallback(async () => {
     try {
       const list = await api.getServices();
-      if (list && list.length > 0) {
+      if (list && Array.isArray(list)) {
         setServices(list);
       }
-    } catch {
-      // offline fallback
+    } catch (err: unknown) {
+      console.warn("Failed to fetch services from backend:", err);
     }
   }, [api]);
 
@@ -135,127 +158,166 @@ export function RunProvider({ children }: { children: React.ReactNode }) {
     refreshServices();
   }, [api, refreshServices]);
 
+  // Step 1: Preview route live from backend server
+  const previewRoute = useCallback(async () => {
+    setIsRunning(true);
+    setError(null);
+    setMessage("Resolving ENSv2 records & evaluating policy router...");
+
+    try {
+      const tinybars = Math.round(parseFloat(budgetHbar) * 100_000_000).toString();
+      const taskName = taskCapability === 'invoice-qa' ? `invoice-qa: ${question}` : 'invoice-extraction';
+      const preview = await api.preview(taskName, tinybars);
+      setRoutePreview(preview);
+      setMessage(`Route selected: ${preview.selected.metadata.name} (${preview.selected.offer.amount} tinybars).`);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setError(`Route preview error: ${msg}`);
+      throw err;
+    } finally {
+      setIsRunning(false);
+    }
+  }, [api, budgetHbar, taskCapability, question]);
+
+  // Step 2: Create Payment Intent on backend server
+  const createPaymentIntent = useCallback(async () => {
+    setIsRunning(true);
+    setError(null);
+    setMessage("Creating payment intent on server...");
+
+    try {
+      const tinybars = Math.round(parseFloat(budgetHbar) * 100_000_000).toString();
+      const invoiceFile = selectedFile || (await getSyntheticInvoiceFile());
+      const payerAccountId = address || '0.0.5902184';
+      const idempotencyKey = `run_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+
+      const run = await api.createRun(
+        {
+          task: taskCapability,
+          maxSpendTinybars: tinybars,
+          payerAccountId,
+          invoice: invoiceFile,
+          ...(taskCapability === 'invoice-qa' && question.trim() ? { question: question.trim() } : {}),
+        },
+        idempotencyKey
+      );
+
+      setActiveRun(run);
+      setMessage(`Payment intent reserved: ${run.runId}. Ready for wallet payment signature.`);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setError(`Create run error: ${msg}`);
+      throw err;
+    } finally {
+      setIsRunning(false);
+    }
+  }, [api, selectedFile, budgetHbar, address, taskCapability, question]);
+
+  // Step 3: Sign payment with Hedera/HashPack wallet & Execute on backend
+  const signAndExecute = useCallback(async () => {
+    if (!activeRun || !activeRun.paymentRequired) {
+      const msg = "No payment required terms found for the active run.";
+      setError(msg);
+      throw new Error(msg);
+    }
+
+    if (new Date(activeRun.expiresAt).getTime() <= Date.now()) {
+      const msg = "Payment intent expired. Cancel and create a new intent.";
+      setError(msg);
+      throw new Error(msg);
+    }
+
+    setIsRunning(true);
+    setError(null);
+    setMessage("Waiting for Hedera wallet signature approval...");
+
+    try {
+      const paymentSignature = await createPaymentSignature(activeRun.paymentRequired);
+      setMessage("Submitting signed x402 payment to server & executing AI inference...");
+
+      const completed = await api.execute(activeRun.runId, paymentSignature);
+      setActiveRun(completed);
+
+      if (completed.status === 'SUCCEEDED') {
+        setIsCompleted(true);
+        setMessage("Run complete! Extraction result delivered.");
+      } else {
+        setMessage(`Run execution status: ${completed.status} / ${completed.paymentStatus}`);
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setError(`Execution error: ${msg}`);
+      throw err;
+    } finally {
+      setIsRunning(false);
+    }
+  }, [api, activeRun, createPaymentSignature]);
+
+  const refreshRunState = useCallback(async () => {
+    if (!activeRun) return;
+    setError(null);
+    try {
+      const refreshed = await api.getRun(activeRun.runId);
+      setActiveRun(refreshed);
+      setMessage(`Refreshed run status: ${refreshed.status} / ${refreshed.paymentStatus}`);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setError(`Refresh error: ${msg}`);
+    }
+  }, [activeRun, api]);
+
   const cancelActiveRun = useCallback(async () => {
     if (!activeRun) return;
+    setIsRunning(true);
+    setError(null);
     try {
       const view = await api.cancel(activeRun.runId);
       setActiveRun(view);
       setIsRunning(false);
+      setMessage("Unsigned payment intent canceled. Budget reservation released.");
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : String(err));
+      const msg = err instanceof Error ? err.message : String(err);
+      setError(`Cancel error: ${msg}`);
+    } finally {
+      setIsRunning(false);
     }
   }, [activeRun, api]);
 
   const reconcileActiveRun = useCallback(async () => {
     if (!activeRun) return;
+    setIsRunning(true);
+    setError(null);
     try {
       const view = await api.reconcile(activeRun.runId);
       setActiveRun(view);
+      setMessage(`Reconciliation result: ${view.paymentStatus}`);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : String(err));
+      const msg = err instanceof Error ? err.message : String(err);
+      setError(`Reconcile error: ${msg}`);
+    } finally {
+      setIsRunning(false);
     }
   }, [activeRun, api]);
 
   const recoverActiveRun = useCallback(async () => {
     if (!activeRun) return;
+    setIsRunning(true);
+    setError(null);
     try {
+      setMessage("Recovering paid extraction result from backend...");
       const view = await api.recover(activeRun.runId);
       setActiveRun(view);
-      if (view.status === 'SUCCEEDED') setIsCompleted(true);
+      if (view.status === 'SUCCEEDED') {
+        setIsCompleted(true);
+        setMessage("Result successfully recovered at zero additional cost.");
+      }
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : String(err));
-    }
-  }, [activeRun, api]);
-
-  const runAgentFlow = useCallback(async (fileParam?: File) => {
-    if (isRunning) return;
-    setIsRunning(true);
-    setIsCompleted(false);
-    setError(null);
-    setActiveStep(1);
-
-    try {
-      // Step 1: Task understood
-      await new Promise((r) => setTimeout(r, 600));
-      setActiveStep(2);
-
-      // Step 2 & 3: ENSv2 discovery & Policy route preview
-      const tinybars = Math.round(parseFloat(budgetHbar) * 100_000_000).toString();
-      let preview: RoutePreview | null = null;
-      try {
-        await unlockSession(process.env.NEXT_PUBLIC_DEMO_CODE || 'ethonline2026');
-        const taskName = taskCapability === 'invoice-qa' ? `invoice-qa: ${question}` : 'invoice-extraction';
-        preview = await api.preview(taskName, tinybars);
-        setRoutePreview(preview);
-      } catch (err: unknown) {
-        console.warn("Backend route preview notice:", err);
-      }
-
-      await new Promise((r) => setTimeout(r, 800));
-      setActiveStep(4); // Route decision locked
-
-      // Prepare image file
-      const invoiceFile = fileParam || selectedFile || (await getSyntheticInvoiceFile());
-
-      await new Promise((r) => setTimeout(r, 600));
-      setActiveStep(5); // 402 challenge terms
-
-      // Create Run on Bryan Backend
-      const payerId = address || '0.0.5902184';
-      const idempotencyKey = `run_${Date.now()}_${Math.random().toString(36).slice(2)}`;
-
-      let runView: RunView | null = null;
-      try {
-        runView = await api.createRun(
-          {
-            task: taskCapability,
-            maxSpendTinybars: tinybars,
-            payerAccountId: payerId,
-            invoice: invoiceFile,
-            ...(taskCapability === 'invoice-qa' ? { question } : {}),
-          },
-          idempotencyKey
-        );
-        setActiveRun(runView);
-      } catch (err: unknown) {
-        console.warn("Create run API notice:", err);
-      }
-
-      await new Promise((r) => setTimeout(r, 700));
-      setActiveStep(6); // Wallet payment signing
-
-      // Sign Payment Signature via Wallet Adapter / Hedera x402
-      let paymentSignature = 'mock_signature_x402';
-      if (runView && runView.paymentRequired) {
-        try {
-          paymentSignature = await createPaymentSignature(runView.paymentRequired);
-        } catch (err: unknown) {
-          console.warn("Wallet signature notice:", err);
-        }
-      }
-
-      await new Promise((r) => setTimeout(r, 800));
-      setActiveStep(7); // Blocky402 verification
-
-      // Execute Run on Bryan Backend
-      if (runView) {
-        try {
-          const executed = await api.execute(runView.runId, paymentSignature);
-          setActiveRun(executed);
-        } catch (err: unknown) {
-          console.warn("Execute API notice:", err);
-        }
-      }
-
-      await new Promise((r) => setTimeout(r, 600));
-      setActiveStep(8); // Service execution completed
-      setIsCompleted(true);
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : String(err));
+      const msg = err instanceof Error ? err.message : String(err);
+      setError(`Recover error: ${msg}`);
     } finally {
       setIsRunning(false);
     }
-  }, [isRunning, budgetHbar, selectedFile, taskCapability, question, api, address, unlockSession, createPaymentSignature]);
+  }, [activeRun, api]);
 
   return (
     <RunContext.Provider
@@ -265,10 +327,10 @@ export function RunProvider({ children }: { children: React.ReactNode }) {
         services,
         routePreview,
         activeRun,
-        activeStep,
         isRunning,
         isCompleted,
         error,
+        message,
         selectedFile,
         taskCapability,
         prompt,
@@ -280,11 +342,15 @@ export function RunProvider({ children }: { children: React.ReactNode }) {
         setQuestion,
         setBudgetHbar,
         unlockSession,
-        runAgentFlow,
+        previewRoute,
+        createPaymentIntent,
+        signAndExecute,
         cancelActiveRun,
         reconcileActiveRun,
         recoverActiveRun,
+        refreshRunState,
         refreshServices,
+        logoutSession,
       }}
     >
       {children}

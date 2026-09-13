@@ -1,79 +1,60 @@
 'use client';
 
+import Link from 'next/link';
 import { useRun } from '@/context/RunContext';
-import { paymentTrace as fallbackTrace } from '@/lib/mockData';
 
 export default function PaymentPage() {
   const { activeRun, isCompleted } = useRun();
 
-  const request = activeRun
-    ? {
-        method: 'POST',
-        url: activeRun.provider ? `https://${activeRun.provider}/extract` : fallbackTrace.request.url,
-        headers: { 'Content-Type': 'multipart/form-data' },
-        body: { task: 'invoice-extraction', payerAccountId: activeRun.payerAccountId },
-      }
-    : fallbackTrace.request;
+  if (!activeRun) {
+    return (
+      <div>
+        <div className="dash-card" style={{ marginBottom: '1.5rem' }}>
+          <div className="dash-card-head">
+            <h2 className="dash-card-title">
+              Payment Trace <span className="dash-tag">x402 + HEDERA</span>
+            </h2>
+            <span className="dash-badge gray">Awaiting Agent Run</span>
+          </div>
+          <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: 1.7, margin: 0 }}>
+            Every machine payment leaves a verifiable audit trail: HTTP 402 challenge, signed x402 payment header, Hedera Testnet consensus transaction, and Blocky402 facilitator verification.
+          </p>
+        </div>
 
-  const challenge = activeRun
-    ? {
-        status: 'HTTP/1.1 402 Payment Required',
-        headers: {
-          'X-402-Version': '2.0',
-          'X-402-PayTo': activeRun.recipientAccountId,
-          'X-402-Amount': (Number(activeRun.amountTinybars) / 100_000_000).toFixed(3),
-          'X-402-Currency': 'HBAR',
-          'X-402-Nonce': activeRun.requestId ? `0x${activeRun.requestId.slice(0, 8)}` : '0x8f2d4e19b',
-        },
-      }
-    : fallbackTrace.challenge;
+        <div className="dash-card" style={{ textAlign: 'center', padding: '3rem 1.5rem' }}>
+          <h3 style={{ fontSize: '1.1rem', marginBottom: '0.5rem' }}>No Active Payment Intent Found</h3>
+          <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '1.25rem' }}>
+            Initiate a payment request in the Agent Console to inspect live 402 challenges and Hedera consensus traces.
+          </p>
+          <Link href="/dashboard" className="console-run" style={{ fontSize: '0.85rem' }}>
+            Go to Agent Console
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
-  const signature = activeRun
-    ? {
-        signer: `${activeRun.payerAccountId} (Hedera Wallet)`,
-        message: `x402 payment for ${activeRun.provider || 'ocr.alpha.eth'}`,
-        signedAt: new Date().toISOString(),
-      }
-    : fallbackTrace.signature;
+  const hbarAmount = activeRun.amountTinybars
+    ? (Number(activeRun.amountTinybars) / 100_000_000).toFixed(3)
+    : '0.010';
 
-  const transaction = activeRun
-    ? {
-        id: activeRun.transactionReference || fallbackTrace.transaction.id,
-        amount: `${(Number(activeRun.amountTinybars) / 100_000_000).toFixed(3)} HBAR`,
-        from: activeRun.payerAccountId,
-        to: activeRun.recipientAccountId,
-        consensus: activeRun.paymentStatus === 'SETTLED' || isCompleted ? 'SUCCESS' : activeRun.paymentStatus || 'RESERVED',
-        latency: '820ms',
-        explorerUrl: activeRun.transactionReference
-          ? `https://hashscan.io/testnet/transaction/${encodeURIComponent(activeRun.transactionReference)}`
-          : 'https://hashscan.io/testnet',
-      }
-    : fallbackTrace.transaction;
+  const explorerUrl = activeRun.transactionReference
+    ? `https://hashscan.io/testnet/transaction/${encodeURIComponent(activeRun.transactionReference)}`
+    : 'https://hashscan.io/testnet';
 
-  const verification = {
-    facilitator: 'Blocky402',
-    status: activeRun ? (activeRun.paymentStatus === 'SETTLED' || isCompleted ? 'verified' : 'pending') : fallbackTrace.verification.status,
-    verifiedAt: new Date().toISOString(),
-  };
-
-  const unlock = {
-    status: activeRun ? (isCompleted ? 'service unlocked' : 'waiting execution') : fallbackTrace.unlock.status,
-    unlockedAt: new Date().toISOString(),
-  };
+  const paymentReq = activeRun.paymentRequired as Record<string, unknown> | undefined;
 
   return (
     <div>
       <div className="dash-card" style={{ marginBottom: '1.5rem' }}>
         <div className="dash-card-head">
           <h2 className="dash-card-title">
-            Payment trace <span className="dash-tag">x402 + HEDERA</span>
+            Payment Trace <span className="dash-tag">x402 + HEDERA</span>
           </h2>
-          <span className="dash-badge lime">{transaction.amount} · {transaction.consensus}</span>
+          <span className="dash-badge lime">{hbarAmount} HBAR · {activeRun.paymentStatus}</span>
         </div>
         <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: 1.7, margin: 0 }}>
-          Every machine payment leaves a verifiable trail: the agent hits the service, receives an
-          HTTP 402 challenge, signs a payment request, settles on Hedera, and the x402 facilitator
-          unlocks the response.
+          Live payment trace for run <span className="dash-mono">{activeRun.runId}</span> on Hedera Testnet settled via Blocky402 facilitator.
         </p>
       </div>
 
@@ -82,11 +63,12 @@ export default function PaymentPage() {
         <div className="pay-step">
           <div className="pay-step-num">1</div>
           <div className="pay-step-body">
-            <div className="pay-step-title">Agent calls the service</div>
+            <div className="pay-step-title">Agent creates payment intent on backend</div>
             <div className="pay-step-code">
-              <span className="k">{request.method}</span> {request.url}
-              <span className="s">Content-Type: {request.headers['Content-Type']}</span>
-              <span className="s">body: {JSON.stringify(request.body)}</span>
+              <span className="k">POST</span> /api/runs
+              <span className="s">runId: {activeRun.runId}</span>
+              <span className="s">payerAccountId: {activeRun.payerAccountId}</span>
+              <span className="s">amountTinybars: {activeRun.amountTinybars} ({hbarAmount} HBAR)</span>
             </div>
           </div>
         </div>
@@ -95,27 +77,28 @@ export default function PaymentPage() {
         <div className="pay-step">
           <div className="pay-step-num">2</div>
           <div className="pay-step-body">
-            <div className="pay-step-title">Service responds: payment required</div>
+            <div className="pay-step-title">Service responds with HTTP 402 challenge</div>
             <div className="pay-step-code">
-              <span className="k">{challenge.status}</span>
-              <span className="s">X-402-Version: {challenge.headers['X-402-Version']}</span>
-              <span className="s">X-402-PayTo: {challenge.headers['X-402-PayTo']}</span>
-              <span className="s">X-402-Amount: {challenge.headers['X-402-Amount']}</span>
-              <span className="s">X-402-Currency: {challenge.headers['X-402-Currency']}</span>
-              <span className="s">X-402-Nonce: {challenge.headers['X-402-Nonce']}</span>
+              <span className="k">HTTP/1.1 402 Payment Required</span>
+              <span className="s">X-402-Version: 2.0</span>
+              <span className="s">X-402-PayTo: {activeRun.recipientAccountId}</span>
+              <span className="s">X-402-Amount: {activeRun.amountTinybars} tinybars</span>
+              <span className="s">X-402-Network: {activeRun.network}</span>
+              <span className="s">X-402-Asset: {activeRun.asset}</span>
+              {paymentReq && <span className="s">Payment Terms: {JSON.stringify(paymentReq, null, 2)}</span>}
             </div>
           </div>
         </div>
 
-        {/* 3 — Signature */}
+        {/* 3 — Wallet signature */}
         <div className="pay-step">
           <div className="pay-step-num">3</div>
           <div className="pay-step-body">
-            <div className="pay-step-title">Agent signs the payment request</div>
+            <div className="pay-step-title">Hedera wallet signs x402 payment signature</div>
             <div className="pay-step-code">
-              <span className="k">signer:</span> {signature.signer}
-              <span className="k">message:</span> {signature.message}
-              <span className="k">signedAt:</span> {signature.signedAt}
+              <span className="k">signer:</span> {activeRun.payerAccountId} (Hedera Testnet Wallet)
+              <span className="k">payTo:</span> {activeRun.recipientAccountId}
+              <span className="k">status:</span> {['SETTLED', 'SUCCEEDED'].includes(activeRun.paymentStatus) ? 'SIGNED & SETTLED' : activeRun.paymentStatus}
             </div>
           </div>
         </div>
@@ -124,17 +107,17 @@ export default function PaymentPage() {
         <div className="pay-step">
           <div className="pay-step-num">4</div>
           <div className="pay-step-body">
-            <div className="pay-step-title">Hedera settles the transfer</div>
+            <div className="pay-step-title">Hedera Testnet consensus transfer</div>
             <div className="pay-step-code">
-              <span className="k">transaction:</span> {transaction.id}
-              <span className="k">amount:</span> {transaction.amount}
-              <span className="k">from:</span> {transaction.from}
-              <span className="k">to:</span> {transaction.to}
-              <span className="k">consensus:</span> {transaction.consensus} · latency {transaction.latency}
+              <span className="k">transactionRef:</span> {activeRun.transactionReference || 'Awaiting settlement'}
+              <span className="k">amount:</span> {hbarAmount} HBAR ({activeRun.amountTinybars} tinybars)
+              <span className="k">from:</span> {activeRun.payerAccountId}
+              <span className="k">to:</span> {activeRun.recipientAccountId}
+              <span className="k">consensus:</span> {activeRun.paymentStatus}
             </div>
             <div style={{ marginTop: '0.6rem' }}>
               <a
-                href={transaction.explorerUrl}
+                href={explorerUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="dash-badge lime"
@@ -150,23 +133,22 @@ export default function PaymentPage() {
         <div className="pay-step">
           <div className="pay-step-num">5</div>
           <div className="pay-step-body">
-            <div className="pay-step-title">x402 facilitator verifies</div>
+            <div className="pay-step-title">Blocky402 facilitator settlement verification</div>
             <div className="pay-step-code">
-              <span className="k">facilitator:</span> {verification.facilitator}
-              <span className="k">status:</span> {verification.status}
-              <span className="k">verifiedAt:</span> {verification.verifiedAt}
+              <span className="k">facilitator:</span> https://api.testnet.blocky402.com
+              <span className="k">status:</span> {['SETTLED', 'SUCCEEDED'].includes(activeRun.paymentStatus) || isCompleted ? 'SETTLED_VERIFIED' : activeRun.paymentStatus}
             </div>
           </div>
         </div>
 
-        {/* 6 — Unlock */}
+        {/* 6 — Execution */}
         <div className="pay-step">
           <div className="pay-step-num">6</div>
           <div className="pay-step-body">
-            <div className="pay-step-title">Service unlocks the response</div>
+            <div className="pay-step-title">Service unlocks AI inference response</div>
             <div className="pay-step-code">
-              <span className="k">status:</span> {unlock.status}
-              <span className="k">unlockedAt:</span> {unlock.unlockedAt}
+              <span className="k">status:</span> {activeRun.status}
+              <span className="k">result:</span> {activeRun.result ? 'DELIVERED' : 'PENDING_EXECUTION'}
             </div>
           </div>
         </div>

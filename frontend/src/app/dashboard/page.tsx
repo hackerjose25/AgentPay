@@ -1,23 +1,19 @@
 'use client';
 
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRun } from '@/context/RunContext';
-import {
-  candidateScores as fallbackCandidates,
-  flowSteps,
-  paymentTrace as fallbackPaymentTrace,
-  routeDecision as fallbackDecision,
-} from '@/lib/mockData';
+import { useWallet } from '@/context/WalletContext';
 
 export default function AgentConsolePage() {
   const {
-    activeRun,
+    session,
     routePreview,
-    activeStep,
+    activeRun,
     isRunning,
     isCompleted,
     error,
+    message,
     selectedFile,
     taskCapability,
     prompt,
@@ -28,13 +24,20 @@ export default function AgentConsolePage() {
     setPrompt,
     setQuestion,
     setBudgetHbar,
-    runAgentFlow,
+    unlockSession,
+    previewRoute,
+    createPaymentIntent,
+    signAndExecute,
     cancelActiveRun,
     reconcileActiveRun,
     recoverActiveRun,
+    refreshRunState,
+    logoutSession,
   } = useRun();
 
+  const { isConnected, displayAddress, openModal } = useWallet();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [accessCode, setAccessCode] = useState(process.env.NEXT_PUBLIC_DEMO_CODE || 'ethonline2026');
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -42,27 +45,61 @@ export default function AgentConsolePage() {
     }
   };
 
-  const selectedProvider = routePreview?.selected?.metadata?.name || fallbackDecision.selectedProvider;
-  const candidatesList = routePreview?.candidates || fallbackCandidates;
-  const reasonText = routePreview?.reason || fallbackDecision.reason;
-
-  const txId = activeRun?.transactionReference || fallbackPaymentTrace.transaction.id;
-  const payTo = activeRun?.recipientAccountId || fallbackPaymentTrace.challenge.headers['X-402-PayTo'];
-  const amountStr = activeRun?.amountTinybars
-    ? (Number(activeRun.amountTinybars) / 100_000_000).toFixed(3)
-    : fallbackPaymentTrace.challenge.headers['X-402-Amount'];
+  const handleUnlock = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await unlockSession(accessCode);
+  };
 
   return (
-    <div>
-      {/* Task & Console Command Bar */}
-      <div className="dash-card" style={{ marginBottom: '1.5rem', background: 'var(--bg-alt)', border: '1px solid var(--border)' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+      {/* Session Lock Banner */}
+      {session && !session.authenticated && (
+        <div className="dash-card" style={{ border: '1px solid rgba(255,180,0,0.4)', background: 'rgba(255,180,0,0.05)' }}>
+          <div className="dash-card-head">
+            <h2 className="dash-card-title" style={{ color: '#ffb400' }}>🔒 Console Locked — Access Code Required</h2>
+          </div>
+          <form onSubmit={handleUnlock} style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
+            <input
+              type="password"
+              value={accessCode}
+              onChange={(e) => setAccessCode(e.target.value)}
+              placeholder="Enter demo access code (ethonline2026)"
+              style={{
+                padding: '0.5rem 0.85rem',
+                borderRadius: '6px',
+                border: '1px solid var(--border)',
+                background: 'rgba(0,0,0,0.5)',
+                color: '#fff',
+                flex: '1',
+                minWidth: '220px',
+              }}
+              required
+            />
+            <button type="submit" className="console-run" style={{ padding: '0.5rem 1.25rem', fontSize: '0.85rem' }} disabled={isRunning}>
+              Unlock Session
+            </button>
+          </form>
+        </div>
+      )}
+
+      {/* Real-time Status / Error Message */}
+      {(message || error) && (
+        <div className="dash-card" style={{ border: error ? '1px solid #f87171' : '1px solid var(--lime)', background: error ? 'rgba(248,113,113,0.05)' : 'rgba(206,255,69,0.05)' }}>
+          <div style={{ fontSize: '0.88rem', fontWeight: 600, color: error ? '#f87171' : 'var(--lime)' }}>
+            {error ? `⚠️ ${error}` : `⚡ ${message}`}
+          </div>
+        </div>
+      )}
+
+      {/* Control Console Form */}
+      <div className="dash-card" style={{ background: 'var(--bg-alt)', border: '1px solid var(--border)' }}>
         <div className="dash-card-head" style={{ marginBottom: '1rem' }}>
           <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
             <span style={{ fontSize: '1.5rem' }}>🤖</span>
             <div>
-              <h2 className="dash-card-title">Agent Control Console</h2>
+              <h2 className="dash-card-title">AegisPay Agent Router Console</h2>
               <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', margin: 0 }}>
-                Configure capability task, file input, and spend bounds to initiate autonomous routing.
+                Configure capability task, select invoice image, set budget limit, and run the real backend workflow.
               </p>
             </div>
           </div>
@@ -84,9 +121,12 @@ export default function AgentConsolePage() {
           </div>
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           {/* Prompt / Question Input */}
-          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+            <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', fontWeight: 600 }}>
+              {taskCapability === 'invoice-qa' ? 'Question for AI Inference:' : 'Task Prompt:'}
+            </label>
             <input
               type="text"
               className="console-task-prompt"
@@ -96,44 +136,44 @@ export default function AgentConsolePage() {
                 background: 'rgba(0,0,0,0.4)',
                 border: '1px solid var(--border)',
                 borderRadius: '6px',
-                padding: '0.6rem 0.85rem',
+                padding: '0.65rem 0.85rem',
                 color: '#fff',
                 width: '100%',
                 fontSize: '0.9rem',
               }}
-              placeholder={taskCapability === 'invoice-qa' ? 'Ask a question about the invoice image...' : 'Extraction prompt...'}
+              placeholder={taskCapability === 'invoice-qa' ? 'e.g. What is the total amount due?' : 'e.g. Extract invoice fields'}
             />
           </div>
 
-          {/* Controls row */}
-          <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-              <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Budget Limit:</span>
+          {/* Settings Row */}
+          <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 600 }}>Max Budget:</span>
               <input
                 type="number"
                 step="0.005"
                 value={budgetHbar}
                 onChange={(e) => setBudgetHbar(e.target.value)}
                 style={{
-                  width: '80px',
+                  width: '90px',
                   background: 'rgba(0,0,0,0.5)',
                   border: '1px solid var(--border)',
                   color: 'var(--lime)',
                   borderRadius: '4px',
-                  padding: '0.25rem 0.5rem',
-                  fontSize: '0.82rem',
-                  fontWeight: 600,
+                  padding: '0.3rem 0.5rem',
+                  fontSize: '0.85rem',
+                  fontWeight: 700,
                 }}
               />
-              <span style={{ fontSize: '0.8rem', color: 'var(--lime)' }}>HBAR</span>
+              <span style={{ fontSize: '0.8rem', color: 'var(--lime)', fontWeight: 700 }}>HBAR</span>
             </div>
 
             <button
               onClick={() => fileInputRef.current?.click()}
               className="dash-badge gray"
-              style={{ cursor: 'pointer', border: '1px dashed var(--lime)', color: 'var(--lime)', padding: '0.35rem 0.75rem' }}
+              style={{ cursor: 'pointer', border: '1px dashed var(--lime)', color: 'var(--lime)', padding: '0.45rem 0.85rem' }}
             >
-              {selectedFile ? `📎 ${selectedFile.name}` : '📁 Select Invoice Image'}
+              {selectedFile ? `📎 ${selectedFile.name}` : '📁 Select Custom Invoice Image'}
             </button>
             <input
               type="file"
@@ -144,167 +184,150 @@ export default function AgentConsolePage() {
             />
 
             <button
-              className={`console-run ${isRunning ? 'running' : ''}`}
-              onClick={() => runAgentFlow()}
+              onClick={previewRoute}
               disabled={isRunning}
-              style={{ marginLeft: 'auto' }}
+              className="console-run"
+              style={{ marginLeft: 'auto', padding: '0.65rem 1.4rem' }}
             >
-              {isRunning ? 'Running…' : isCompleted ? 'Run again' : '▶ Execute Agent Flow'}
+              {isRunning ? '🔄 Resolving Route...' : '1. Preview Route (ENSv2 + Policy)'}
             </button>
           </div>
         </div>
-
-        {/* Operational recovery buttons */}
-        {activeRun && (
-          <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem', paddingTop: '0.85rem', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
-            <span style={{ fontSize: '0.75rem', color: '#888', alignSelf: 'center' }}>Run Controls:</span>
-            {activeRun.paymentStatus === 'RESERVED' && (
-              <button onClick={cancelActiveRun} className="dash-badge amber" style={{ cursor: 'pointer' }}>
-                🚫 Cancel Reservation
-              </button>
-            )}
-            <button onClick={reconcileActiveRun} className="dash-badge gray" style={{ cursor: 'pointer' }}>
-              🔍 Reconcile Hedera Mirror Node
-            </button>
-            <button onClick={recoverActiveRun} className="dash-badge lime" style={{ cursor: 'pointer' }}>
-              🔄 Recover Extraction (0 Cost)
-            </button>
-          </div>
-        )}
       </div>
 
-      {error && (
-        <div className="dash-card" style={{ borderLeft: '4px solid #ef4444', color: '#f87171', marginBottom: '1.5rem' }}>
-          <b>Execution Notice:</b> {error}
-        </div>
-      )}
-
-      <div className="dash-grid-2">
-        {/* Flow timeline */}
+      {/* Step 2: Route Preview Results */}
+      {routePreview && (
         <div className="dash-card">
           <div className="dash-card-head">
             <h2 className="dash-card-title">
-              Execution flow <span className="dash-tag">LIVE PIPELINE</span>
+              Step 2: Route Decision & Candidates <span className="dash-tag">ENSv2 RESOLVED</span>
             </h2>
-            {isCompleted && <span className="dash-badge lime">✓ completed</span>}
+            <span className="dash-badge lime">{routePreview.selected.metadata.name}</span>
           </div>
-          <div className="flow-timeline">
-            {flowSteps.map((step, i) => {
-              const stepIndex = i + 1;
-              const isDone = activeStep > stepIndex || isCompleted;
-              const isActive = activeStep === stepIndex && isRunning;
-              const statusClass = isDone ? 'done' : isActive ? 'active' : 'pending';
 
-              return (
-                <div key={step.id} className={`flow-step ${statusClass}`}>
-                  <div className="flow-step-dot">
-                    {isDone ? '✓' : stepIndex}
-                  </div>
-                  <div className="flow-step-body">
-                    <div className="flow-step-label">
-                      {step.label}
-                      {isActive && <span className="dash-badge amber">in progress</span>}
-                    </div>
-                    <div className="flow-step-desc">{step.desc}</div>
-                    <div className="flow-step-detail">{step.detail}</div>
-                  </div>
-                </div>
-              );
-            })}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '1.25rem' }}>
+            <div style={{ background: 'rgba(0,0,0,0.3)', padding: '0.85rem', borderRadius: '6px', border: '1px solid var(--border)' }}>
+              <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>SELECTED PROVIDER</div>
+              <div style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--lime)', marginTop: '0.25rem' }}>
+                {routePreview.selected.metadata.name}
+              </div>
+            </div>
+            <div style={{ background: 'rgba(0,0,0,0.3)', padding: '0.85rem', borderRadius: '6px', border: '1px solid var(--border)' }}>
+              <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>OFFER PRICE</div>
+              <div style={{ fontSize: '0.95rem', fontWeight: 700, color: '#fff', marginTop: '0.25rem' }}>
+                {routePreview.selected.offer.amount} tinybars ({(Number(routePreview.selected.offer.amount) / 100_000_000).toFixed(3)} HBAR)
+              </div>
+            </div>
+            <div style={{ background: 'rgba(0,0,0,0.3)', padding: '0.85rem', borderRadius: '6px', border: '1px solid var(--border)' }}>
+              <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>RECIPIENT ACCOUNT</div>
+              <div style={{ fontSize: '0.95rem', fontWeight: 700, color: '#fff', marginTop: '0.25rem', fontFamily: 'monospace' }}>
+                {routePreview.selected.metadata.recipient}
+              </div>
+            </div>
+            <div style={{ background: 'rgba(0,0,0,0.3)', padding: '0.85rem', borderRadius: '6px', border: '1px solid var(--border)' }}>
+              <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>NETWORK & ASSET</div>
+              <div style={{ fontSize: '0.95rem', fontWeight: 700, color: '#fff', marginTop: '0.25rem' }}>
+                {routePreview.selected.metadata.network} ({routePreview.selected.metadata.asset})
+              </div>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
+            {!isConnected ? (
+              <button onClick={openModal} className="console-run" style={{ background: 'rgba(255,255,255,0.1)', color: '#fff', border: '1px solid var(--border)' }}>
+                🔗 Connect Payer Wallet
+              </button>
+            ) : (
+              <span className="dash-badge lime">Connected: {displayAddress}</span>
+            )}
+
+            <button
+              onClick={createPaymentIntent}
+              disabled={isRunning}
+              className="console-run"
+            >
+              {isRunning ? 'Creating Intent...' : '2. Create Payment Intent (Reserve Budget)'}
+            </button>
           </div>
         </div>
+      )}
 
-        {/* Results column */}
-        <div>
-          {/* Candidates discovered */}
-          <div className="dash-card">
-            <div className="dash-card-head">
-              <h2 className="dash-card-title">Discovered Candidates</h2>
-              <span className="dash-badge gray">ENSv2 · Sepolia</span>
+      {/* Step 3: Active Payment Run & Settlement */}
+      {activeRun && (
+        <div className="dash-card">
+          <div className="dash-card-head">
+            <h2 className="dash-card-title">
+              Step 3: Payment Settlement & AI Execution <span className="dash-tag">{activeRun.status}</span>
+            </h2>
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <span className="dash-badge lime">Payment: {activeRun.paymentStatus}</span>
+              <span className="dash-badge gray">Run: {activeRun.runId.slice(0, 12)}...</span>
             </div>
-            {candidatesList.map((c) => {
-              const isSel = c.provider === selectedProvider;
-              return (
-                <div key={c.provider} className={`score-row ${isSel ? 'selected' : ''}`}>
-                  <div className="score-row-top">
-                    <span className="score-row-name">
-                      {c.provider}
-                      {isSel && (
-                        <span className="dash-badge lime" style={{ marginLeft: '0.5rem' }}>selected</span>
-                      )}
-                    </span>
-                    <span className="score-row-total">{c.total.toFixed(2)}</span>
-                  </div>
-                  <div className="score-bar">
-                    <div className="score-bar-fill" style={{ width: `${c.total * 100}%` }} />
-                  </div>
-                  <div className="score-row-factors">
-                    <span>capability <b>{c.capabilityMatch.toFixed(2)}</b></span>
-                    <span>reliability <b>{c.reliabilitySignal.toFixed(2)}</b></span>
-                    <span>activity <b>{c.activitySignal.toFixed(2)}</b></span>
-                    <span>price <b>{c.priceScore.toFixed(2)}</b></span>
-                  </div>
-                </div>
-              );
-            })}
           </div>
 
-          {/* Routing decision */}
-          <div className="dash-card">
-            <div className="dash-card-head">
-              <h2 className="dash-card-title">Policy Routing Decision</h2>
-              <span className="dash-badge lime">BRYAN ROUTER</span>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '1.25rem' }}>
+            <div style={{ background: 'rgba(0,0,0,0.3)', padding: '0.85rem', borderRadius: '6px', border: '1px solid var(--border)' }}>
+              <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>AMOUNT RESERVED</div>
+              <div style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--lime)', marginTop: '0.25rem' }}>
+                {activeRun.amountTinybars} tinybars
+              </div>
             </div>
-            <p className="decision-reason">
-              <b>{selectedProvider}</b> — {reasonText}. Alternatives considered: beta.ocr.agentpay.eth.
-            </p>
-            <div className="decision-factors">
-              <div className="decision-factor">
-                <div className="val">0.30</div>
-                <div className="lbl">capability</div>
+            <div style={{ background: 'rgba(0,0,0,0.3)', padding: '0.85rem', borderRadius: '6px', border: '1px solid var(--border)' }}>
+              <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>PAYER ACCOUNT</div>
+              <div style={{ fontSize: '0.95rem', fontWeight: 700, color: '#fff', marginTop: '0.25rem', fontFamily: 'monospace' }}>
+                {activeRun.payerAccountId}
               </div>
-              <div className="decision-factor">
-                <div className="val">0.35</div>
-                <div className="lbl">reliability</div>
-              </div>
-              <div className="decision-factor">
-                <div className="val">0.20</div>
-                <div className="lbl">activity</div>
-              </div>
-              <div className="decision-factor">
-                <div className="val">0.15</div>
-                <div className="lbl">price</div>
+            </div>
+            <div style={{ background: 'rgba(0,0,0,0.3)', padding: '0.85rem', borderRadius: '6px', border: '1px solid var(--border)' }}>
+              <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>TRANSACTION REF</div>
+              <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#fff', marginTop: '0.25rem', fontFamily: 'monospace', overflowWrap: 'anywhere' }}>
+                {activeRun.transactionReference || 'Awaiting wallet signature'}
               </div>
             </div>
           </div>
 
-          {/* Payment status */}
-          <div className="dash-card">
-            <div className="dash-card-head">
-              <h2 className="dash-card-title">Payment &amp; Consensus Status</h2>
-              <span className={`dash-badge ${isCompleted ? 'lime' : activeRun ? 'amber' : 'gray'}`}>
-                {isCompleted ? 'PAID · VERIFIED' : activeRun ? 'RESERVED · SIGNING' : 'AWAITING RUN'}
-              </span>
-            </div>
-            <div className="dash-mono" style={{ lineHeight: 1.9, fontSize: '0.8rem' }}>
-              <div>X-402-PayTo: <span style={{ color: 'var(--lime)' }}>{payTo}</span></div>
-              <div>X-402-Amount: <span style={{ color: 'var(--lime)' }}>{amountStr} HBAR</span></div>
-              <div>Transaction: {txId}</div>
-              <div>Status: {activeRun?.paymentStatus || (isCompleted ? 'SETTLED' : 'PENDING')}</div>
-            </div>
-            <div style={{ marginTop: '1rem', display: 'flex', gap: '0.5rem' }}>
-              <Link href="/dashboard/payment" className="console-run" style={{ padding: '0.55rem 1.2rem', fontSize: '0.8rem' }}>
-                View payment trace →
-              </Link>
-              {isCompleted && (
-                <Link href="/dashboard/result" className="console-run" style={{ padding: '0.55rem 1.2rem', fontSize: '0.8rem', background: 'var(--lime)', color: '#000' }}>
-                  View extracted result →
-                </Link>
-              )}
-            </div>
+          {/* Action Toolbar */}
+          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '1.25rem' }}>
+            {activeRun.paymentStatus === 'RESERVED' && (
+              <button onClick={signAndExecute} disabled={isRunning} className="console-run">
+                {isRunning ? 'Processing...' : '3. Sign Payment & Execute AI Extraction'}
+              </button>
+            )}
+
+            <button onClick={refreshRunState} disabled={isRunning} className="dash-badge gray" style={{ cursor: 'pointer', padding: '0.5rem 0.85rem' }}>
+              🔄 Refresh Status
+            </button>
+
+            {activeRun.paymentStatus === 'RESERVED' && (
+              <button onClick={cancelActiveRun} disabled={isRunning} className="dash-badge gray" style={{ cursor: 'pointer', padding: '0.5rem 0.85rem', color: '#f87171' }}>
+                ✖ Cancel Intent
+              </button>
+            )}
+
+            {['UNKNOWN', 'SUBMITTING'].includes(activeRun.paymentStatus) && (
+              <button onClick={reconcileActiveRun} disabled={isRunning} className="dash-badge gray" style={{ cursor: 'pointer', padding: '0.5rem 0.85rem', color: '#ffb400' }}>
+                🔍 Reconcile Payment
+              </button>
+            )}
+
+            {activeRun.paymentStatus === 'SETTLED' && activeRun.status !== 'SUCCEEDED' && (
+              <button onClick={recoverActiveRun} disabled={isRunning} className="dash-badge lime" style={{ cursor: 'pointer', padding: '0.5rem 0.85rem' }}>
+                🔄 Recover Free Result
+              </button>
+            )}
           </div>
+
+          {/* Result Block */}
+          {activeRun.result ? (
+            <div style={{ marginTop: '1rem' }}>
+              <h3 style={{ fontSize: '0.9rem', color: 'var(--lime)', marginBottom: '0.5rem' }}> Inferred Extraction Result:</h3>
+              <pre className="result-output" style={{ background: '#0d0d0d', padding: '1rem', borderRadius: '6px', border: '1px solid var(--border)', fontSize: '0.82rem', overflowX: 'auto' }}>
+                {JSON.stringify(activeRun.result, null, 2)}
+              </pre>
+            </div>
+          ) : null}
         </div>
-      </div>
+      )}
     </div>
   );
 }

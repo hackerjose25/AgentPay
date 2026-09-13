@@ -15,6 +15,7 @@
     "dev:server": "npm run dev -w @agentpay/server",
     "dev:frontend": "npm run dev -w @agentpay/frontend",
     "start": "concurrently -k -n server,frontend \"npm run start -w @agentpay/server\" \"npm run start -w @agentpay/frontend\"",
+    "test": "npx vitest run",
     "lint": "eslint .",
     "doctor": "node --import tsx scripts/doctor.ts",
     "db:migrate": "node --import tsx scripts/db-migrate.ts",

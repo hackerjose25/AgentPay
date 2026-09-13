@@ -53,7 +53,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     try {
-      const saved = localStorage.getItem('agentpay_wallet');
+      const saved = localStorage.getItem('aegispay_wallet') || localStorage.getItem('agentpay_wallet');
       if (saved) {
         const data = JSON.parse(saved);
         if (data.address && data.walletType) {
@@ -72,6 +72,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       try {
         const hpAdapter = new HashPackWalletAdapter({ projectId });
         setAdapter(hpAdapter);
+        window.aegisPayWallet = hpAdapter;
         window.agentPayWallet = hpAdapter;
       } catch {
         // ignore setup error if project id is placeholder
@@ -102,7 +103,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
           setBalance('245.50');
           setIsConnected(true);
           setIsModalOpen(false);
-          localStorage.setItem('agentpay_wallet', JSON.stringify({
+          localStorage.setItem('aegispay_wallet', JSON.stringify({
             address: res.accountId,
             walletType: 'hashpack',
             balance: '245.50',
@@ -142,7 +143,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
               setBalance('84.20');
               setIsConnected(true);
               setIsModalOpen(false);
-              localStorage.setItem('agentpay_wallet', JSON.stringify({
+              localStorage.setItem('aegispay_wallet', JSON.stringify({
                 address: userAddr,
                 walletType: 'metamask',
                 balance: '84.20',
@@ -176,7 +177,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       setIsConnected(true);
       setIsModalOpen(false);
 
-      localStorage.setItem('agentpay_wallet', JSON.stringify({
+      localStorage.setItem('aegispay_wallet', JSON.stringify({
         address: mockAddr,
         walletType: type,
         balance: mockBal,
@@ -187,9 +188,10 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   }, [adapter]);
 
   const createPaymentSignature = useCallback(async (paymentRequired: unknown): Promise<string> => {
-    if (typeof window !== "undefined" && window.agentPayWallet) {
+    const walletAdapter = typeof window !== "undefined" ? (window.aegisPayWallet || window.agentPayWallet) : undefined;
+    if (walletAdapter) {
       try {
-        return await window.agentPayWallet.createPaymentSignature(paymentRequired);
+        return await walletAdapter.createPaymentSignature(paymentRequired);
       } catch (err: unknown) {
         console.warn("Wallet adapter payment signature failed, generating wallet signature:", err);
       }
@@ -216,6 +218,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       adapter.disconnect().catch(() => undefined);
     }
     try {
+      localStorage.removeItem('aegispay_wallet');
       localStorage.removeItem('agentpay_wallet');
     } catch {
       // ignore

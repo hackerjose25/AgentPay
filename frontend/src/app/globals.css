@@ -116,6 +116,7 @@ body.scroll-down.scroll-min .navbar {
 
 .navbar .brand { display: flex; align-items: center; gap: .75rem; }
 .navbar .brand svg { width: 36px; height: 36px; }
+.navbar .brand-logo-img { width: 36px; height: 36px; object-fit: contain; border-radius: 6px; }
 .navbar .brand-text {
   font-size: 1.25rem; font-weight: 600; letter-spacing: -.02em;
 }

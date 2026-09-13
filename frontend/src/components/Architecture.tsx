@@ -38,25 +38,25 @@ const pipelineStages: PipelineStage[] = [
     description:
       'The agent queries ENSv2 for subname candidates providing required capabilities under the owned parent domain on Sepolia without central gatekeepers.',
     specs: [
-      { label: 'Parent Name', value: 'agentpay.eth' },
+      { label: 'Parent Name', value: 'aegispay.eth' },
       { label: 'Network', value: 'ENSv2 (Sepolia)' },
       { label: 'Candidates Found', value: '2 Active Services' },
       { label: 'Endpoint Protocol', value: 'x402-v2 / HTTPS' },
     ],
     fileLabel: 'ens_discovery_lookup.json',
     payload: `// 1. ENSv2 machine discovery query
-RESOLVE ens_records("*.ocr.agentpay.eth", { capability: "invoice-extraction" })
+RESOLVE ens_records("*.ocr.aegispay.eth", { capability: "invoice-extraction" })
 
 --> RESOLVED CANDIDATES:
 [
   {
-    "domain": "alpha.ocr.agentpay.eth",
+    "domain": "alpha.ocr.aegispay.eth",
     "endpoint": "https://alpha.example/extract",
     "price": "0.010 HBAR",
     "hederaAccount": "0.0.4829103"
   },
   {
-    "domain": "beta.ocr.agentpay.eth",
+    "domain": "beta.ocr.aegispay.eth",
     "endpoint": "https://beta.example/extract",
     "price": "0.020 HBAR",
     "hederaAccount": "0.0.3912048"
@@ -98,14 +98,14 @@ POST /api/route
 --> VERIFIED CANDIDATES:
 [
   {
-    "name": "alpha.ocr.agentpay.eth",
+    "name": "alpha.ocr.aegispay.eth",
     "endpoint": "https://alpha.example/extract",
     "recipient": "0.0.4829103",
     "price": "1,000,000 tinybars (0.010 HBAR)",
     "status": "ACTIVE_ELIGIBLE"
   },
   {
-    "name": "beta.ocr.agentpay.eth",
+    "name": "beta.ocr.aegispay.eth",
     "endpoint": "https://beta.example/extract",
     "recipient": "0.0.3912048",
     "price": "2,000,000 tinybars (0.020 HBAR)",
@@ -131,7 +131,7 @@ POST /api/route
     description:
       'Decision engine evaluates candidates against policy budget and SLA bounds to lock in the cheapest eligible provider.',
     specs: [
-      { label: 'Winner Selected', value: 'alpha.ocr.agentpay.eth' },
+      { label: 'Winner Selected', value: 'alpha.ocr.aegispay.eth' },
       { label: 'Composite Score', value: '0.932 / 1.000' },
       { label: 'Budget Cap', value: '0.050 HBAR max' },
       { label: 'Route Rationale', value: 'Lowest price eligible offer' },
@@ -145,9 +145,9 @@ POST /api/route
     "allowedAsset": "0.0.0",
     "network": "hedera:testnet"
   },
-  "selectedProvider": "alpha.ocr.agentpay.eth",
+  "selectedProvider": "alpha.ocr.aegispay.eth",
   "offerTinybars": "1000000",
-  "alternativesConsidered": ["beta.ocr.agentpay.eth"],
+  "alternativesConsidered": ["beta.ocr.aegispay.eth"],
   "decisionStatus": "ROUTE_CONFIRMED"
 }`,
   },

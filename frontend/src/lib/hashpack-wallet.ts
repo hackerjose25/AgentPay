@@ -36,8 +36,8 @@ export class HashPackWalletAdapter implements HederaBrowserWalletAdapter {
       const origin = this.options.origin || (typeof window !== "undefined" ? window.location.origin : "http://localhost:3000");
       const connector = new DAppConnector(
         {
-          name: "AgentPay",
-          description: "Approve AgentPay invoice-extraction payments on Hedera Testnet",
+          name: "AegisPay",
+          description: "Approve AegisPay invoice-extraction payments on Hedera Testnet",
           url: origin,
           icons: []
         },

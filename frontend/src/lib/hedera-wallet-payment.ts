@@ -21,8 +21,8 @@ export type WalletTransactionSigner = (transaction: TransferTransaction) => Prom
 
 function requiredHbarTerms(paymentRequired: unknown) {
   const parsed = validatePaymentRequired(paymentRequired);
-  if (parsed.x402Version !== 2) throw new Error("AgentPay requires an x402 v2 payment request.");
-  if (parsed.accepts.length !== 1) throw new Error("AgentPay requires exactly one payment option.");
+  if (parsed.x402Version !== 2) throw new Error("AegisPay requires an x402 v2 payment request.");
+  if (parsed.accepts.length !== 1) throw new Error("AegisPay requires exactly one payment option.");
 
   const requirements = parsed.accepts[0]!;
   if (requirements.scheme !== "exact") throw new Error("The payment scheme must be exact.");

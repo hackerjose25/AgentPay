@@ -25,7 +25,10 @@ export default function Footer() {
       </div>
 
       <div className="end">
-        <div className="copy">AgentPay</div>
+        <div className="copy" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <img src="/logo.png" alt="AegisPay" style={{ width: 24, height: 24, objectFit: 'contain' }} />
+          <span>AegisPay</span>
+        </div>
         <ul className="links">
           <li><a href="/dashboard">Console</a></li>
           <li><a href="https://hashscan.io/testnet" target="_blank" rel="noopener noreferrer">HashScan</a></li>

@@ -75,6 +75,7 @@ export interface WalletConnectionOptions {
 
 declare global {
   interface Window {
+    aegisPayWallet?: HederaBrowserWalletAdapter;
     agentPayWallet?: HederaBrowserWalletAdapter;
   }
 }
@@ -168,3 +169,5 @@ export class AgentPayApi {
     return this.request(`/api/runs/${encodeURIComponent(runId)}/recover`, { method: "POST" });
   }
 }
+
+export { AgentPayApi as AegisPayApi };

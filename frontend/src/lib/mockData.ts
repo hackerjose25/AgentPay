@@ -1,7 +1,7 @@
 // ============================================================
-// AgentPay — Mock data for the frontend dashboard.
+// AegisPay — Mock data for the frontend dashboard.
 // The backend (built separately) will replace these with live
-// ENSv2 / The Graph / Hedera / x402 data. All values mirror the
+// ENSv2 / Hedera / x402 data. All values mirror the
 // examples in README.md so the UI matches the documented flow.
 // ============================================================
 
@@ -257,7 +257,7 @@ export const executionResult = {
       'INVOICE #INV-2026-0912',
       '',
       'Vendor: Meridian Labs GmbH',
-      'Client: AgentPay Research',
+      'Client: AegisPay Research',
       '',
       'Line items:',
       '  · Neural inference cluster (8× H100) — 48.0 h — $1,920.00',
