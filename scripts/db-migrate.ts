@@ -22,7 +22,8 @@ try {
   const filenames = (await readdir(migrationsDirectory)).filter((name) => /^\d+.*\.sql$/.test(name)).sort();
   for (const filename of filenames) {
     const sql = await readFile(resolve(migrationsDirectory, filename), "utf8");
-    const checksum = createHash("sha256").update(sql).digest("hex");
+    const normalizedSql = sql.replace(/\r\n/g, "\n");
+    const checksum = createHash("sha256").update(normalizedSql).digest("hex");
     const existing = await client.query<{ checksum: string }>("SELECT checksum FROM schema_migrations WHERE filename = $1", [filename]);
     if (existing.rows[0]) {
       if (existing.rows[0].checksum !== checksum) throw new Error(`applied migration ${filename} was modified`);

@@ -6,6 +6,7 @@ playwright-report/
 test-results/
 .env
 .env.*
+envs/
 !.env.example
 !.env.ens-setup.example
 *.log

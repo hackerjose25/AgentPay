@@ -154,7 +154,8 @@ body.scroll-down.scroll-min .navbar {
 section.hero {
   min-height: 100vh; position: relative;
   display: flex; flex-direction: column;
-  padding-top: 7rem; overflow: hidden;
+  justify-content: center; align-items: center;
+  padding-top: 5rem; padding-bottom: 3rem; overflow: hidden;
 }
 
 section.hero video {
@@ -167,6 +168,7 @@ section.hero .content {
   flex: 1; display: flex; position: relative;
   max-width: 90rem; width: 100%; margin: 0 auto;
   padding: 0 2rem;
+  align-items: center; justify-content: center;
 }
 section.hero .content::before, section.hero .content::after {
   content: ''; position: absolute; left: 0; right: 0;
@@ -190,11 +192,13 @@ section.hero .content .circle path {
 section.hero .content .side {
   flex: 1; display: flex; flex-direction: column;
   justify-content: center; position: relative;
-  padding-left: 10rem;
+  padding-left: clamp(1.5rem, 5vw, 6rem);
+  z-index: 2;
 }
 section.hero .content .side:last-child {
   justify-content: center; align-items: flex-end;
-  text-align: right; padding-left: 0; padding-right: 10rem;
+  text-align: right; padding-left: 0;
+  padding-right: clamp(1.5rem, 5vw, 6rem);
 }
 
 section.hero .content .side .infos {
@@ -208,7 +212,7 @@ section.hero .content .side .infos .item.is-inview {
   opacity: 1; transform: translateY(0);
 }
 section.hero .content .side .infos .item .number {
-  font-size: clamp(2.5rem, 8vh, 4rem);
+  font-size: clamp(2.2rem, 7vh, 3.75rem);
   font-weight: 500; letter-spacing: -.03em; line-height: 1;
 }
 section.hero .content .side .infos .item .number sub {
@@ -239,34 +243,39 @@ section.hero .content .side .infos .line.is-inview { width: 1.5rem; }
 
 /* Hero Title */
 section.hero .content .title {
-  flex: 1; display: flex; flex-direction: column;
+  flex: 1.5; display: flex; flex-direction: column;
   align-items: center; justify-content: center;
   text-align: center; position: relative;
+  width: 100%; z-index: 2;
 }
 
 section.hero .content .title > p {
   font-size: 1rem; color: var(--text-secondary);
-  margin-bottom: 2rem; letter-spacing: -.01em;
+  margin-bottom: 1.75rem; letter-spacing: -.01em;
   opacity: 0; transform: translateY(1.5rem);
   transition: opacity .75s var(--ease) .7s, transform .75s var(--ease) .7s;
 }
 section.hero .content .title > p.is-inview { opacity: 1; transform: translateY(0); }
 
 section.hero .content .title h2 {
-  font-size: clamp(2.5rem, 8vh, 5.625rem);
-  font-weight: 600; line-height: 1.05; letter-spacing: -.04em;
+  font-size: clamp(2.2rem, 6.5vh, 5.25rem);
+  font-weight: 600; line-height: 1.08; letter-spacing: -.04em;
   opacity: 0; transform: translateY(1.5rem);
   transition: opacity .75s var(--ease), transform .75s var(--ease);
+  text-align: center;
 }
 section.hero .content .title h2.is-inview { opacity: 1; transform: translateY(0); }
 section.hero .content .title h2 span { color: var(--lime); }
 
 section.hero .content .title .buttons {
-  display: flex; gap: 1rem; margin-top: 3.5rem;
+  display: flex; gap: 1rem; margin-top: 3rem;
   flex-wrap: wrap;
   width: max-content;
   max-width: 100%;
   justify-content: center;
+  align-items: center;
+  margin-left: auto;
+  margin-right: auto;
   opacity: 0; transform: translateY(1.5rem);
   transition: opacity .75s var(--ease) .8s, transform .75s var(--ease) .8s;
 }
@@ -2734,4 +2743,41 @@ section.ecosystem .list .card.active {
   background: rgba(255, 60, 60, 0.16);
   border-color: #ff5555;
 }
+
+/* Hero section mobile protocols & responsive styling */
+.hero-mobile-protocols, .wallet-text-short {
+  display: none;
+}
+@media (max-width: 1024px) {
+  section.hero .content { text-align: center; flex-direction: column; }
+  section.hero .content .side { display: none; }
+  section.hero .content .title { padding: 3rem 0; }
+}
+@media (max-width: 768px) {
+  .hero-mobile-protocols {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.65rem;
+    width: 100%;
+    max-width: 22rem;
+    margin: 2.25rem auto 0;
+  }
+  .hero-proto-pill {
+    text-align: left;
+    transition: all 0.25s var(--ease);
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    border-radius: 4px;
+    flex-direction: column;
+    padding: 0.65rem 0.8rem;
+    display: flex;
+  }
+  .hero-proto-pill:hover, .hero-proto-pill:active {
+    border-color: var(--lime);
+    background: rgba(206, 255, 69, 0.06);
+  }
+  .hero-proto-pill .proto-name { color: var(--white); font-size: 0.8rem; font-weight: 700; }
+  .hero-proto-pill .proto-desc { color: var(--lime); margin-top: 0.15rem; font-size: 0.65rem; }
+}
+
 

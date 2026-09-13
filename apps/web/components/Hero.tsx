@@ -24,8 +24,8 @@ export default function Hero() {
 
   return (
     <section className="hero">
-      <video ref={videoRef} muted loop playsInline data-anim="fade" data-anim-duration="1500">
-        <source src="/videos/footer.mp4" type="video/mp4" />
+      <video ref={videoRef} autoPlay muted loop playsInline data-anim="fade" data-anim-duration="1500">
+        <source src="https://rly.serious.business/wp-content/themes/rly_network/dist/videos/hero.mp4" type="video/mp4" />
       </video>
       <div className="content">
         {/* Left side */}

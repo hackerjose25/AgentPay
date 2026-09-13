@@ -8,6 +8,11 @@ const extractionTask = "Extract the invoice fields";
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000";
 const walletConnectProjectId = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID ?? "";
 
+function formatHashscanUrl(txRef: string): string {
+  const normalized = txRef.replace("@", "-").replace(/(\d+)\.(\d+)$/, "$1-$2");
+  return `https://hashscan.io/testnet/transaction/${encodeURIComponent(normalized)}`;
+}
+
 export default function DashboardPage() {
   const api = useMemo(() => new AgentPayApi(apiBaseUrl), []);
   const [authenticated, setAuthenticated] = useState(false);
@@ -159,10 +164,17 @@ export default function DashboardPage() {
       <header className="dash-topbar">
         <h1 className="dash-title">Agent Console</h1>
         <div className="dash-topbar-right">
-          <span className="dash-network">
+          <a
+            href="https://hashscan.io/testnet"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="dash-network"
+            title="Explore Hedera Testnet on HashScan"
+            style={{ textDecoration: "none" }}
+          >
             <span className="dash-dot"></span>
-            Hedera Testnet · 296
-          </span>
+            Hedera Testnet · 296 ↗
+          </a>
           <span className={`dash-wallet-status${payerAccountId ? " connected" : ""}`} title={payerAccountId ? "Connected via HashPack" : "Connect your wallet from the home page header"}>
             <span className="dash-dot"></span>
             {payerAccountId ? payerAccountId : "Wallet not connected"}
@@ -251,10 +263,39 @@ export default function DashboardPage() {
                       <tr><th>Payment</th><td>{run.paymentStatus}</td></tr>
                       <tr><th>Execution</th><td>{run.status}</td></tr>
                       <tr><th>Amount</th><td>{run.amountTinybars} tinybars</td></tr>
+                      {run.transactionReference && (
+                        <tr>
+                          <th>Transaction</th>
+                          <td>
+                            <a
+                              href={formatHashscanUrl(run.transactionReference)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="dash-mono"
+                              style={{ color: "var(--lime)", textDecoration: "underline", fontWeight: 600 }}
+                            >
+                              {run.transactionReference} (Verify on HashScan ↗)
+                            </a>
+                          </td>
+                        </tr>
+                      )}
                     </tbody>
                   </table>
                 </div>
-                {run.result ? <pre className="result-output">{JSON.stringify(run.result, null, 2)}</pre> : (
+                {run.transactionReference && (
+                  <div style={{ marginTop: "1rem" }}>
+                    <a
+                      href={formatHashscanUrl(run.transactionReference)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="dash-btn-secondary"
+                      style={{ borderColor: "rgba(206, 255, 69, 0.4)", color: "var(--lime)", display: "inline-flex" }}
+                    >
+                      Verify Transaction on HashScan ↗
+                    </a>
+                  </div>
+                )}
+                {run.result ? <pre className="result-output" style={{ marginTop: "1rem" }}>{JSON.stringify(run.result, null, 2)}</pre> : (
                   <div className="dash-card-actions">
                     <button className="console-run" onClick={signAndExecute} disabled={busy || run.paymentStatus !== "RESERVED"}>Sign and execute</button>
                     <button className="dash-btn-secondary" onClick={refreshRun} disabled={busy}>Refresh status</button>

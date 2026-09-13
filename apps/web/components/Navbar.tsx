@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
 import { QRCodeSVG } from 'qrcode.react';
 import { getWalletAccountId, subscribeWalletAccount } from '../lib/wallet-store';
 
@@ -83,6 +84,10 @@ export default function Navbar() {
         <div className="open-contact">
           <a href="https://github.com/hackerjose25/AgentPay.git" target="_blank" rel="noopener noreferrer">GitHub</a>
         </div>
+
+        <Link className="nav-console-btn" href="/dashboard">
+          <span>Console</span>
+        </Link>
 
         {connectedAccountId ? (
           <button className="nav-wallet-btn connected" onClick={disconnectWallet} title="Disconnect HashPack">

@@ -981,3 +981,80 @@ Correction to `20260911T041309Z-root-render-blueprint-guidance`: `render.yaml` d
 - Verification: `git status --short` shows only the deletion; grep found no vercel.json references in README/docs. No build was rerun (no code changed).
 - External side effects: None. No deployment, database write, inference, or payment occurred.
 - Outcome / next step: The owner should commit and push the deletion to `7bryan7/AgentPay`, optionally set Node.js Version to 22.x in the Vercel project settings (matches the repo's tested engine `>=22 <23`; the default 24.x also satisfies Next 16.3.4's requirement), then redeploy. Root Directory remains `apps/web`; the two NEXT_PUBLIC env vars are unchanged.
+
+### 20260913T134700Z-antigravity-clone-repo — Clone AgentPay repository into workspace
+
+- Recorded at: 2026-09-13 13:47:00 UTC
+- Agent: Antigravity
+- Task: Clone `https://github.com/7bryan7/AgentPay.git` repository into workspace directory.
+- Actions: Executed `git clone https://github.com/7bryan7/AgentPay.git .` in workspace directory `c:\Users\JOSE REGISH\OneDrive\Desktop\ethnew`. Verified contents and logged history entry.
+- Files: Cloned repository files into workspace root; appended this entry to `HISTORY.md`.
+- Verification: Command `git clone` completed successfully with exit code 0; workspace directory contents confirmed.
+- External side effects: Read-only clone from public GitHub repository. No blockchain transactions, deployments, or paid inference calls.
+- Outcome / next step: Repository successfully cloned into workspace. Ready for next task or development steps.
+
+### 20260913T140500Z-antigravity-hero-structure-aligned — Align Hero section & Header structure with reference site
+
+- Recorded at: 2026-09-13 14:05:00 UTC
+- Agent: Antigravity
+- Task: Restructure the Hero section and Header to match reference site `https://agent-pay-eth.vercel.app/`.
+- Actions: (1) Inspected DOM and CSS of reference site `https://agent-pay-eth.vercel.app/`. (2) Added `<Link className="nav-console-btn" href="/dashboard"><span>Console</span></Link>` to `apps/web/components/Navbar.tsx` so the prominent green Console button appears in the navbar. (3) Updated protocol labels and side items in `apps/web/components/Hero.tsx` to match the exact layout of the reference site. (4) Added missing responsive styles for `.hero-mobile-protocols`, `.hero-proto-pill`, `.side`, and `.content` media queries in `apps/web/app/globals.css`. (5) Refined `ScrollObserver.tsx` animation observer to trigger `is-inview` transitions directly using CSS transition delays.
+- Files: `apps/web/components/Navbar.tsx`, `apps/web/components/Hero.tsx`, `apps/web/components/ScrollObserver.tsx`, `apps/web/app/globals.css`; appended this entry to `HISTORY.md`.
+- Verification: `npm run typecheck -w @agentpay/web` exit code 0. Verified HTML/CSS structure matches reference site `https://agent-pay-eth.vercel.app/`.
+- External side effects: None. Read-only inspection of reference site. No blockchain transactions, deployments, or paid inference calls.
+- Outcome / next step: Hero section and Header layout successfully aligned with reference site `https://agent-pay-eth.vercel.app/`.
+
+### 20260913T140700Z-antigravity-hero-bg-video-updated — Update Hero background video source
+
+- Recorded at: 2026-09-13 14:07:00 UTC
+- Agent: Antigravity
+- Task: Update hero background video source to `https://rly.serious.business/wp-content/themes/rly_network/dist/videos/hero.mp4`.
+- Actions: Updated `<video>` element in `apps/web/components/Hero.tsx` to set `source src="https://rly.serious.business/wp-content/themes/rly_network/dist/videos/hero.mp4"`.
+- Files: `apps/web/components/Hero.tsx`; appended this entry to `HISTORY.md`.
+- Verification: `npm run typecheck -w @agentpay/web` exit code 0.
+- External side effects: None.
+- Outcome / next step: Hero background video updated and verified.
+
+### 20260913T141400Z-antigravity-hero-blocky402-update — Replace Graph with Blocky402 in Hero section
+
+- Recorded at: 2026-09-13 14:14:00 UTC
+- Agent: Antigravity
+- Task: Replace `Graph` / `Provider Intelligence →` with `Blocky402` / `Facilitator Settlement →` in the Hero section.
+- Actions: Updated side item and mobile protocol pills in `apps/web/components/Hero.tsx` to display `Blocky402` and `Facilitator Settlement →` linking to `https://blocky402.com`.
+- Files: `apps/web/components/Hero.tsx`; appended this entry to `HISTORY.md`.
+- Verification: `npm run typecheck -w @agentpay/web` exit code 0.
+- External side effects: None.
+- Outcome / next step: Hero section protocol items updated to Blocky402 and verified.
+
+### 20260913T141700Z-antigravity-hero-centering-refinement — Refine Hero section centering & responsive padding
+
+- Recorded at: 2026-09-13 14:17:00 UTC
+- Agent: Antigravity
+- Task: Center hero section title, buttons, and content vertically and horizontally across viewports.
+- Actions: Updated `section.hero`, `section.hero .content`, `section.hero .content .title`, and `section.hero .content .side` in `apps/web/app/globals.css` with flex ratio `1.5` for `.title`, responsive `clamp(1.5rem, 5vw, 6rem)` padding for side items, and explicit flexbox alignment (`justify-content: center`, `align-items: center`).
+- Files: `apps/web/app/globals.css`; appended this entry to `HISTORY.md`.
+- Verification: `npm run typecheck -w @agentpay/web` exit code 0.
+- External side effects: None.
+- Outcome / next step: Hero section alignment and centering refined.
+
+### 20260913T144130Z-root-hashscan-verification-console — Add HashScan transaction verification to Agent Console
+
+- Recorded at: 2026-09-13 14:41:30 UTC
+- Agent: Antigravity
+- Task: Add functionality for the user to verify any transaction that occurs via integrated HashScan links in the Agent Console.
+- Actions: Added `formatHashscanUrl` helper in `apps/web/app/dashboard/page.tsx`, integrated HashScan link into topbar network badge, added a dedicated Transaction table row with a HashScan verification link whenever `run.transactionReference` is present, and added a standalone HashScan verification action button in the Payment & Result section.
+- Files: `apps/web/app/dashboard/page.tsx`; appended this entry to `HISTORY.md`.
+- Verification: `npm run typecheck` passed (exit code 0).
+- External side effects: None.
+- Outcome / next step: Any transaction occurring in the console can now be directly verified by the user on HashScan testnet via integrated links.
+
+### 20260913T162430Z-root-live-env-configuration-and-verification — Configure live environment credentials and verify functional flow
+
+- Recorded at: 2026-09-13 16:24:30 UTC
+- Agent: Antigravity
+- Task: Configure project environment from `envs/` folder and verify full non-mocked execution (ENSv2, Supabase DB, Blocky402, Hedera Testnet, Gemini 3.6 Flash).
+- Actions: Created root `.env`, `.env.ens-setup`, and `apps/web/.env.local` using credentials from `envs/`; normalized line endings in `scripts/db-migrate.ts` for checksum validation; ran database migrations; verified live system readiness, live ENSv2 resolution, dry-run payment gate, and live testnet payment.
+- Files: `.env`, `.env.ens-setup`, `apps/web/.env.local`, `scripts/db-migrate.ts`; appended this entry to `HISTORY.md`.
+- Verification: `npm run doctor` passed all 5 live readiness checks (Environment, Supabase DB, Sepolia RPC at block 11696830, Blocky402 exact x402 v2 fee payer 0.0.7162784, Gemini model metadata HTTP 200); `npm run db:migrate` applied database schema; `npm run ens:verify` resolved both Sepolia ENS candidates (`alpha.ocr.agentpayapp.eth` and `beta.ocr.agentpayapp.eth`); `npx tsx scripts/smoke-testnet.ts --dry-run` passed prepayment gate; `npx tsx scripts/smoke-testnet.ts --pay` completed real testnet payment settled via Blocky402 (Tx Ref: `0.0.7162784@1789113168.530015612`); `npm test` passed 17 test files (49 tests).
+- External side effects: Real Hedera Testnet micro-settlement co-signed via Blocky402 facilitator and live Gemini Developer API metadata check.
+- Outcome / next step: Project is fully operational with live ENSv2 identity, Blocky402 Hedera Testnet settlement, Supabase persistence, and Gemini invoice extraction without mocks.

@@ -19,15 +19,6 @@ export default function ScrollObserver() {
                 c.classList.add('is-inview')
               );
             }
-            // Stagger siblings
-            const parent = e.target.parentElement;
-            if (parent) {
-              const sibs = parent.querySelectorAll('[data-anim]');
-              sibs.forEach((s, i) => {
-                const d = parseInt(s.getAttribute('data-anim-delay') || '0');
-                setTimeout(() => s.classList.add('is-inview'), d + i * 80);
-              });
-            }
           }
         });
       },
