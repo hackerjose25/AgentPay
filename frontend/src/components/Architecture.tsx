@@ -36,36 +36,30 @@ const pipelineStages: PipelineStage[] = [
     statusType: 'success',
     headline: 'Machine-Readable Service Discovery',
     description:
-      'The agent queries ENSv2 for candidates providing required capabilities without central gatekeepers or hardcoded provider endpoints.',
+      'The agent queries ENSv2 for subname candidates providing required capabilities under the owned parent domain on Sepolia without central gatekeepers.',
     specs: [
-      { label: 'Query', value: 'ocr.*.eth' },
-      { label: 'Network', value: 'ENSv2 (Hedera Native)' },
-      { label: 'Candidates Found', value: '3 Verified Services' },
-      { label: 'Endpoint Protocol', value: 'x402-v1 / HTTPS' },
+      { label: 'Parent Name', value: 'agentpay.eth' },
+      { label: 'Network', value: 'ENSv2 (Sepolia)' },
+      { label: 'Candidates Found', value: '2 Active Services' },
+      { label: 'Endpoint Protocol', value: 'x402-v2 / HTTPS' },
     ],
     fileLabel: 'ens_discovery_lookup.json',
     payload: `// 1. ENSv2 machine discovery query
-QUERY ens_records("ocr.*.eth", { capability: "invoice_ocr" })
+RESOLVE ens_records("*.ocr.agentpay.eth", { capability: "invoice-extraction" })
 
 --> RESOLVED CANDIDATES:
 [
   {
-    "domain": "ocr.alpha.eth",
-    "endpoint": "https://alpha.example/ocr",
+    "domain": "alpha.ocr.agentpay.eth",
+    "endpoint": "https://alpha.example/extract",
     "price": "0.010 HBAR",
     "hederaAccount": "0.0.4829103"
   },
   {
-    "domain": "ocr.beta.eth",
-    "endpoint": "https://beta.example/ocr",
-    "price": "0.007 HBAR",
-    "hederaAccount": "0.0.3920194"
-  },
-  {
-    "domain": "ocr.gamma.eth",
-    "endpoint": "https://gamma.example/ocr",
-    "price": "0.012 HBAR",
-    "hederaAccount": "0.0.5102941"
+    "domain": "beta.ocr.agentpay.eth",
+    "endpoint": "https://beta.example/extract",
+    "price": "0.020 HBAR",
+    "hederaAccount": "0.0.3912048"
   }
 ]`,
   },
@@ -73,8 +67,8 @@ QUERY ens_records("ocr.*.eth", { capability: "invoice_ocr" })
     id: 'evaluate',
     stepNum: '02',
     name: 'EVALUATE',
-    sub: 'The Graph Telemetry',
-    badge: 'The Graph · Decentralized Indexing',
+    sub: 'Deterministic Policy',
+    badge: 'Policy · Endpoint Verification',
     icon: (
       <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2">
         <line x1="18" y1="20" x2="18" y2="10" />
@@ -82,33 +76,42 @@ QUERY ens_records("ocr.*.eth", { capability: "invoice_ocr" })
         <line x1="6" y1="20" x2="6" y2="14" />
       </svg>
     ),
-    status: 'INDEX TELEMETRY ACQUIRED',
+    status: 'POLICY VERIFIED',
     statusType: 'success',
-    headline: 'Historical Evidence & Reputation',
+    headline: 'Hard Eligibility & Price Verification',
     description:
-      'The Graph returns verifiable on-chain performance signals: request volumes, failure rates, uptime latency, and past settlement proofs.',
+      'The routing policy evaluates candidate offers against strict rules: capability match, active state, allowed HTTPS origin, network/asset, recipient, and budget limit.',
     specs: [
-      { label: 'Subgraph', value: 'agentpay-hedera-telemetry' },
-      { label: 'Index Coverage', value: '11,400+ Total Requests' },
-      { label: 'Top Provider Rate', value: '98.7% Success (alpha)' },
-      { label: 'Query Latency', value: '142ms' },
+      { label: 'Filter Rule', value: 'Hard Eligibility & Budget' },
+      { label: 'Price Verification', value: '1,000,000 tinybars' },
+      { label: 'Network / Asset', value: 'hedera:testnet / 0.0.0' },
+      { label: 'Validation Time', value: '45ms' },
     ],
-    fileLabel: 'graph_reputation_telemetry.graphql',
-    payload: `// 2. The Graph queries indexed reputation & latency
-QUERY SubgraphTelemetry($domains: ["ocr.alpha.eth", "ocr.beta.eth", "ocr.gamma.eth"]) {
-  providers(where: { domain_in: $domains }) {
-    domain
-    completedRequests
-    successRate
-    medianLatencyMs
-    reputationScore
-  }
+    fileLabel: 'policy_route_verification.json',
+    payload: `// 2. Policy verifies provider candidates & price offers
+POST /api/route
+{
+  "task": "invoice-extraction",
+  "maxSpendTinybars": "5000000"
 }
 
---> TELEMETRY VERDICT:
-ocr.alpha.eth: 2,431 tasks · 98.7% success · 420ms · score: 0.96 (OPTIMAL)
-ocr.beta.eth:     48 tasks · 91.6% success · 890ms · score: 0.74 (LOW SAMPLE)
-ocr.gamma.eth: 8,921 tasks · 97.2% success · 380ms · score: 0.94 (EXPENSIVE)`,
+--> VERIFIED CANDIDATES:
+[
+  {
+    "name": "alpha.ocr.agentpay.eth",
+    "endpoint": "https://alpha.example/extract",
+    "recipient": "0.0.4829103",
+    "price": "1,000,000 tinybars (0.010 HBAR)",
+    "status": "ACTIVE_ELIGIBLE"
+  },
+  {
+    "name": "beta.ocr.agentpay.eth",
+    "endpoint": "https://beta.example/extract",
+    "recipient": "0.0.3912048",
+    "price": "2,000,000 tinybars (0.020 HBAR)",
+    "status": "ACTIVE_ELIGIBLE"
+  }
+]`,
   },
   {
     id: 'decide',
@@ -126,31 +129,25 @@ ocr.gamma.eth: 8,921 tasks · 97.2% success · 380ms · score: 0.94 (EXPENSIVE)`
     statusType: 'success',
     headline: 'Multi-Factor Policy Route Selection',
     description:
-      'Decision engine evaluates candidates against policy budget, SLA bounds, and composite scoring metrics to lock in the optimal route.',
+      'Decision engine evaluates candidates against policy budget and SLA bounds to lock in the cheapest eligible provider.',
     specs: [
-      { label: 'Winner Selected', value: 'ocr.alpha.eth' },
+      { label: 'Winner Selected', value: 'alpha.ocr.agentpay.eth' },
       { label: 'Composite Score', value: '0.932 / 1.000' },
       { label: 'Budget Cap', value: '0.050 HBAR max' },
-      { label: 'Route Rationale', value: 'Reliability/Cost optimum' },
+      { label: 'Route Rationale', value: 'Lowest price eligible offer' },
     ],
     fileLabel: 'agent_routing_verdict.json',
-    payload: `// 3. AI Policy Engine scores candidates against constraints
+    payload: `// 3. Router selects cheapest eligible provider
 {
-  "task": "invoice_ocr",
+  "task": "invoice-extraction",
   "policyBounds": {
     "maxBudget": "0.050 HBAR",
-    "minReliability": 0.95,
-    "maxLatencyMs": 1000
+    "allowedAsset": "0.0.0",
+    "network": "hedera:testnet"
   },
-  "decisionFactors": {
-    "reliabilityWeight": 0.35,
-    "capabilityMatch": 0.30,
-    "reputationHistory": 0.20,
-    "costEfficiency": 0.15
-  },
-  "selectedProvider": "ocr.alpha.eth",
-  "compositeScore": 0.932,
-  "alternativesConsidered": ["ocr.beta.eth", "ocr.gamma.eth"],
+  "selectedProvider": "alpha.ocr.agentpay.eth",
+  "offerTinybars": "1000000",
+  "alternativesConsidered": ["beta.ocr.agentpay.eth"],
   "decisionStatus": "ROUTE_CONFIRMED"
 }`,
   },
@@ -169,7 +166,7 @@ ocr.gamma.eth: 8,921 tasks · 97.2% success · 380ms · score: 0.94 (EXPENSIVE)`
     statusType: 'success',
     headline: 'Machine-to-Machine Instant Micro-Settlement',
     description:
-      'The service returns HTTP 402. The autonomous agent immediately executes an on-chain HBAR transfer on Hedera with sub-second finality.',
+      'The service returns HTTP 402. The autonomous agent immediately executes an on-chain HBAR transfer on Hedera via Blocky402 with sub-second finality.',
     specs: [
       { label: 'Protocol Gate', value: 'HTTP 402 Payment Required' },
       { label: 'Settlement Asset', value: '0.010 HBAR ($0.0006)' },
@@ -178,20 +175,20 @@ ocr.gamma.eth: 8,921 tasks · 97.2% success · 380ms · score: 0.94 (EXPENSIVE)`
     ],
     fileLabel: 'hedera_consensus_receipt.http',
     payload: `// 4. x402 challenge issued & paid on Hedera
---> POST https://alpha.example/ocr
+--> POST https://alpha.example/extract
 <-- HTTP/1.1 402 Payment Required
     X-402-PayTo: 0.0.4829103
-    X-402-Amount: 0.010 HBAR
-    X-402-Nonce: 7f83b165-4f29
+    X-402-Amount: 1000000 tinybars
+    X-402-FeePayer: 0.0.7162784
 
 --> HEDERA TRANSACT:
-    Payer: 0.0.9482104 (Agent) → Receiver: 0.0.4829103
+    Payer: 0.0.5902184 (Agent) → Receiver: 0.0.4829103
     Amount: 1,000,000 tinybars (0.010 HBAR)
 
 <-- HEDERA CONSENSUS CONFIRMATION:
     Status: SUCCESS (200 OK)
-    TxID: 0.0.9482104@1718293812.000000000
-    Receipt: https://hashscan.io/testnet/transaction/0.0.9482104@1718293812`,
+    TxID: 0.0.5902184@1718293812.000000000
+    Receipt: https://hashscan.io/testnet/transaction/0.0.5902184@1718293812`,
   },
   {
     id: 'unlock',
@@ -209,7 +206,7 @@ ocr.gamma.eth: 8,921 tasks · 97.2% success · 380ms · score: 0.94 (EXPENSIVE)`
     statusType: 'success',
     headline: 'Cryptographic Proof & Execution Result',
     description:
-      'Blocky402 validator validates the Hedera consensus receipt. The endpoint unlocks instantly and delivers high-fidelity AI output.',
+      'Blocky402 validator validates the Hedera consensus receipt. The endpoint unlocks instantly and delivers high-fidelity Gemini AI invoice extraction output.',
     specs: [
       { label: 'Response Code', value: '200 OK' },
       { label: 'Validator', value: 'Blocky402 Consensus Gate' },
@@ -218,8 +215,8 @@ ocr.gamma.eth: 8,921 tasks · 97.2% success · 380ms · score: 0.94 (EXPENSIVE)`
     ],
     fileLabel: 'ai_service_result.json',
     payload: `// 5. Proof verified → Service execution completed
---> POST https://alpha.example/ocr
-    Authorization: Bearer x402-0.0.9482104@1718293812
+--> POST https://alpha.example/extract
+    Payment-Signature: x402-0.0.5902184@1718293812
 
 <-- HTTP/1.1 200 OK
     Content-Type: application/json
@@ -227,12 +224,11 @@ ocr.gamma.eth: 8,921 tasks · 97.2% success · 380ms · score: 0.94 (EXPENSIVE)`
 
 {
   "status": "completed",
-  "task": "invoice_ocr",
+  "task": "invoice-extraction",
   "result": {
-    "vendor": "Acme Services LLC",
-    "invoiceNumber": "INV-2026-894",
-    "total": 450.00,
-    "currency": "USD",
+    "vendor": "Meridian Labs GmbH",
+    "invoiceNumber": "INV-2026-0912",
+    "total": "$2,306.30",
     "confidence": 0.994
   },
   "computeTimeMs": 312,
@@ -284,7 +280,7 @@ export default function Architecture() {
               from discovery to <span>instant settlement</span>.
             </h2>
             <p>
-              ENSv2 discovers. The Graph evaluates. AI scores. Hedera settles. x402 unlocks. Zero human intervention in the execution loop.
+              ENSv2 discovers. Policy evaluates. AI scores. Hedera settles. x402 unlocks. Zero human intervention in the execution loop.
             </p>
           </div>
 
@@ -455,7 +451,7 @@ export default function Architecture() {
               <div className="terminal-footer">
                 <div className="terminal-foot-item">
                   <span className="foot-label">Protocol:</span>
-                  <span className="foot-val">HTTP/1.1 402 / ENSv2 / Graph</span>
+                  <span className="foot-val">HTTP/1.1 402 / ENSv2 / Hedera</span>
                 </div>
                 <div className="terminal-foot-item">
                   <span className="foot-label">Status:</span>

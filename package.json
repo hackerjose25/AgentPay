@@ -1,11 +1,36 @@
 {
-  "name": "ethonline",
-  "version": "1.0.0",
+  "name": "agentpay",
+  "version": "0.1.0",
   "private": true,
+  "type": "module",
+  "description": "AgentPay — Main UI Frontend + Bryan Backend Integration",
+  "workspaces": [
+    "frontend",
+    "apps/*",
+    "packages/*"
+  ],
   "scripts": {
-    "dev": "npm --prefix frontend run dev",
-    "build": "npm --prefix frontend run build",
-    "start": "npm --prefix frontend run start",
-    "lint": "npm --prefix frontend run lint"
+    "build": "npm run build -w @agentpay/core && npm run build -w @agentpay/server && npm run build -w @agentpay/frontend",
+    "dev": "concurrently -k -n server,frontend -c blue,green \"npm run dev -w @agentpay/server\" \"npm run dev -w @agentpay/frontend\"",
+    "dev:server": "npm run dev -w @agentpay/server",
+    "dev:frontend": "npm run dev -w @agentpay/frontend",
+    "start": "concurrently -k -n server,frontend \"npm run start -w @agentpay/server\" \"npm run start -w @agentpay/frontend\"",
+    "lint": "eslint .",
+    "doctor": "node --import tsx scripts/doctor.ts",
+    "db:migrate": "node --import tsx scripts/db-migrate.ts",
+    "ens:setup": "node --import tsx scripts/ens-setup.ts",
+    "ens:verify": "node --import tsx scripts/ens-verify.ts",
+    "directory:add": "node --import tsx scripts/directory-add.ts",
+    "smoke:testnet": "node --import tsx scripts/smoke-testnet.ts"
+  },
+  "devDependencies": {
+    "@types/node": "22.20.2",
+    "@types/pg": "8.23.1",
+    "concurrently": "10.0.5",
+    "dotenv": "17.4.2",
+    "pg": "8.23.0",
+    "tsx": "4.23.13",
+    "typescript": "5.9.3",
+    "viem": "2.56.3"
   }
 }

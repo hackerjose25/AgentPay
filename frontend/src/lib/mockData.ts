@@ -273,10 +273,10 @@ export const executionResult = {
   },
   proofTrail: [
     { step: 'ENS identity', value: 'ocr.alpha.eth → 0.0.4829103', href: 'https://ens.domains/' },
-    { step: 'Provider evidence', value: '2,431 completed · 98.7% success · activity: high', href: 'https://thegraph.com/' },
+    { step: 'Provider evidence', value: 'Live active status · 100% endpoint readiness', href: '/dashboard/intelligence' },
     { step: 'Routing decision', value: 'Selected: ocr.alpha.eth — best reliability/cost tradeoff', href: '/dashboard' },
     { step: 'Hedera payment', value: '0.01 HBAR · tx 0.0.18293@1718293812.000000000', href: 'https://hashscan.io/testnet' },
-    { step: 'x402 verification', value: 'Blocky402 verified · service unlocked', href: 'https://x402.org/' },
+    { step: 'x402 verification', value: 'Blocky402 verified · service unlocked', href: 'https://blocky402.com/' },
     { step: 'Inference result', value: 'OCR output delivered · confidence 99.4%', href: '/dashboard/result' },
   ],
 };
@@ -292,14 +292,14 @@ export interface FlowStep {
 }
 
 export const flowSteps: FlowStep[] = [
-  { id: 'task', label: 'Task understood', desc: 'Capability identified', detail: 'Required capability: document-ocr (OCR / document extraction)' },
-  { id: 'discover', label: 'ENSv2 discovery', desc: '3 candidates found', detail: 'ocr.alpha.eth · ocr.beta.eth · ocr.gamma.eth resolved via ENSv2 records' },
-  { id: 'evaluate', label: 'The Graph evaluation', desc: 'Signals retrieved', detail: 'Live indexed evidence: activity, completed requests, payment history' },
-  { id: 'decide', label: 'Route decision', desc: 'ocr.alpha.eth selected', detail: 'Score 0.93 — best reliability/cost tradeoff under policy' },
+  { id: 'task', label: 'Task understood', desc: 'Capability identified', detail: 'Required capability: invoice-extraction (OCR / document extraction)' },
+  { id: 'discover', label: 'ENSv2 discovery', desc: 'Candidates found', detail: 'alpha.ocr.agentpay.eth · beta.ocr.agentpay.eth resolved via ENSv2 Sepolia' },
+  { id: 'evaluate', label: 'Readiness & Policy', desc: 'Offers verified', detail: 'Live endpoint readiness, price check, and hard budget filtering' },
+  { id: 'decide', label: 'Route decision', desc: 'ocr.alpha.agentpay.eth selected', detail: 'Lowest price candidate selected under budget policy' },
   { id: 'x402', label: 'HTTP 402', desc: 'Payment required', detail: '402 Payment Required · 0.01 HBAR → 0.0.4829103' },
   { id: 'pay', label: 'Hedera payment', desc: 'Transaction submitted', detail: 'Agent wallet signed and submitted HBAR transfer' },
-  { id: 'verify', label: 'Blocky402 verification', desc: 'Payment verified', detail: 'Facilitator confirmed settlement on Hedera' },
-  { id: 'execute', label: 'Service executes', desc: 'Result returned', detail: 'OCR service processed the invoice and returned the result' },
+  { id: 'verify', label: 'Blocky402 verification', desc: 'Payment verified', detail: 'Facilitator confirmed settlement on Hedera Testnet' },
+  { id: 'execute', label: 'Service executes', desc: 'Result returned', detail: 'Gemini AI processed the invoice and returned structured fields' },
 ];
 
 export const agentTask = {

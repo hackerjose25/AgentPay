@@ -188,13 +188,13 @@ section.hero .content .circle path {
 
 /* Hero Sides */
 section.hero .content .side {
-  flex: 1; display: flex; flex-direction: column;
+  flex: 0 0 22%; display: flex; flex-direction: column;
   justify-content: center; position: relative;
-  padding-left: 10rem;
+  padding-left: 2rem;
 }
 section.hero .content .side:last-child {
   justify-content: center; align-items: flex-end;
-  text-align: right; padding-left: 0; padding-right: 10rem;
+  text-align: right; padding-left: 0; padding-right: 2rem;
 }
 
 section.hero .content .side .infos {
@@ -208,7 +208,7 @@ section.hero .content .side .infos .item.is-inview {
   opacity: 1; transform: translateY(0);
 }
 section.hero .content .side .infos .item .number {
-  font-size: clamp(2.5rem, 8vh, 4rem);
+  font-size: clamp(2rem, 5vh, 3.25rem);
   font-weight: 500; letter-spacing: -.03em; line-height: 1;
 }
 section.hero .content .side .infos .item .number sub {
@@ -239,22 +239,26 @@ section.hero .content .side .infos .line.is-inview { width: 1.5rem; }
 
 /* Hero Title */
 section.hero .content .title {
-  flex: 1; display: flex; flex-direction: column;
+  flex: 0 0 56%; max-width: 54rem; margin: 0 auto;
+  display: flex; flex-direction: column;
   align-items: center; justify-content: center;
   text-align: center; position: relative;
 }
 
 section.hero .content .title > p {
   font-size: 1rem; color: var(--text-secondary);
-  margin-bottom: 2rem; letter-spacing: -.01em;
+  margin-bottom: 1.75rem; letter-spacing: -.01em;
+  text-align: center; margin-left: auto; margin-right: auto;
+  max-width: 32rem;
   opacity: 0; transform: translateY(1.5rem);
   transition: opacity .75s var(--ease) .7s, transform .75s var(--ease) .7s;
 }
 section.hero .content .title > p.is-inview { opacity: 1; transform: translateY(0); }
 
 section.hero .content .title h2 {
-  font-size: clamp(2.5rem, 8vh, 5.625rem);
-  font-weight: 600; line-height: 1.05; letter-spacing: -.04em;
+  font-size: clamp(2.5rem, 7vh, 5rem);
+  font-weight: 600; line-height: 1.08; letter-spacing: -.04em;
+  text-align: center; margin-left: auto; margin-right: auto;
   opacity: 0; transform: translateY(1.5rem);
   transition: opacity .75s var(--ease), transform .75s var(--ease);
 }
@@ -262,11 +266,12 @@ section.hero .content .title h2.is-inview { opacity: 1; transform: translateY(0)
 section.hero .content .title h2 span { color: var(--lime); }
 
 section.hero .content .title .buttons {
-  display: flex; gap: 1rem; margin-top: 3.5rem;
+  display: flex; gap: 1rem; margin-top: 3rem;
   flex-wrap: wrap;
   width: max-content;
   max-width: 100%;
-  justify-content: center;
+  justify-content: center; align-items: center;
+  margin-left: auto; margin-right: auto;
   opacity: 0; transform: translateY(1.5rem);
   transition: opacity .75s var(--ease) .8s, transform .75s var(--ease) .8s;
 }

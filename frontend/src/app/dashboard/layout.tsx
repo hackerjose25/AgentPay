@@ -83,7 +83,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
         <div className="dash-sidebar-foot">
           <div className="dash-flow-mini">
-            <span>ENS</span>→<span>Graph</span>→<span>AI</span>→<span>Hedera</span>→<span>x402</span>
+            <span>ENSv2</span>→<span>Policy</span>→<span>AI</span>→<span>Hedera</span>→<span>x402</span>
           </div>
           <a
             href="https://github.com/hackerjose25/AgentPay.git"

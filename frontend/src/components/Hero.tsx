@@ -39,8 +39,8 @@ export default function Hero() {
             </div>
             <div className="line" data-anim data-anim-delay="1350"></div>
             <div className="item" data-anim="fade-up" data-anim-delay="1200">
-              <div className="number">Graph</div>
-              <div className="desc"><a href="https://thegraph.com" target="_blank" rel="noopener noreferrer">Provider Intelligence &rarr;</a></div>
+              <div className="number">Blocky402</div>
+              <div className="desc"><a href="https://blocky402.com" target="_blank" rel="noopener noreferrer">Payment Facilitator &rarr;</a></div>
             </div>
           </div>
         </div>
@@ -69,9 +69,9 @@ export default function Hero() {
               <span className="proto-name">ENSv2 &rarr;</span>
               <span className="proto-desc">Identity &amp; Discovery</span>
             </a>
-            <a href="https://thegraph.com" target="_blank" rel="noopener noreferrer" className="hero-proto-pill">
-              <span className="proto-name">The Graph &rarr;</span>
-              <span className="proto-desc">Provider Intelligence</span>
+            <a href="https://blocky402.com" target="_blank" rel="noopener noreferrer" className="hero-proto-pill">
+              <span className="proto-name">Blocky402 &rarr;</span>
+              <span className="proto-desc">x402 Facilitator</span>
             </a>
             <a href="https://hedera.com" target="_blank" rel="noopener noreferrer" className="hero-proto-pill">
               <span className="proto-name">Hedera &rarr;</span>

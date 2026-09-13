@@ -4,8 +4,8 @@ import { useEffect, useRef, useCallback } from 'react';
 
 const features = [
   { title: 'ENSv2 Discovery', desc: '"Who can do this?" — Providers publish machine-readable identities and capabilities through ENSv2 names and records.' },
-  { title: 'The Graph Intelligence', desc: '"Who should I trust?" — Live indexed blockchain data evaluates candidates with measurable signals, not blind selection.' },
-  { title: 'AI Decision Engine', desc: '"Which one to choose?" — Combines capability, price, and provider evidence into a runtime routing decision.' },
+  { title: 'Deterministic Policy Engine', desc: '"Who to choose?" — Evaluates candidate readiness, price, active state, valid recipient, and hard budget limits.' },
+  { title: 'AI Router Decision', desc: '"Which candidate wins?" — Selects the cheapest eligible provider, breaking ties by normalized ENS subdomain.' },
   { title: 'Hedera Settlement', desc: '"How does the agent pay?" — The agent settles the selected service directly with HBAR — no accounts, no cards.' },
   { title: 'x402 Payment Gate', desc: '"How does the service request payment?" — The endpoint becomes machine-payable through HTTP 402 Payment Required.' },
 ];
@@ -353,7 +353,7 @@ export default function ProblemSolution() {
             the evidence decides,<br />
             the agent <span>pays</span>.
           </h2>
-          <p>An autonomous routing layer where agents discover services through ENSv2, evaluate providers with on-chain evidence, and pay for the best option themselves.</p>
+          <p>An autonomous routing layer where agents discover services through ENSv2, evaluate providers with deterministic policy, and pay for the best option themselves.</p>
         </div>
         <div className="features-btn-wrap">
           <a className="btn solid mask-bt loop" href="https://x402.org" target="_blank" rel="noopener noreferrer">

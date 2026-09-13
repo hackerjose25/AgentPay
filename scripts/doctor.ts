@@ -1,0 +1,73 @@
+import { Client } from "pg";
+import { createPublicClient, http } from "viem";
+import { sepolia } from "viem/chains";
+import { requiredRuntimeKeys } from "../apps/server/src/config.js";
+import { fetchHederaFacilitatorSupport } from "../apps/server/src/payments/facilitator.js";
+import { hasPlaceholder, jsonLog, loadRootEnv, safeErrorDetail } from "./shared.js";
+
+loadRootEnv();
+type Check = { name: string; ok: boolean; detail: string };
+const checks: Check[] = [];
+
+const missing = requiredRuntimeKeys.filter((key) => hasPlaceholder(process.env[key]));
+checks.push({
+  name: "environment",
+  ok: missing.length === 0,
+  detail: missing.length === 0 ? "required runtime values are configured" : `missing or placeholder keys: ${missing.join(", ")}`
+});
+
+async function check(name: string, action: () => Promise<string>): Promise<void> {
+  try {
+    checks.push({ name, ok: true, detail: await action() });
+  } catch (error) {
+    checks.push({ name, ok: false, detail: safeErrorDetail(name, error) });
+  }
+}
+
+if (!hasPlaceholder(process.env.DATABASE_URL)) {
+  await check("database", async () => {
+    const client = new Client({ connectionString: process.env.DATABASE_URL, connectionTimeoutMillis: 5_000 });
+    await client.connect();
+    try { await client.query("SELECT 1"); } finally { await client.end(); }
+    return "connection succeeded";
+  });
+}
+
+if (!hasPlaceholder(process.env.ENS_RPC_URL) && process.env.ENS_CHAIN_ID === "11155111") {
+  await check("ens-rpc", async () => {
+    const client = createPublicClient({ chain: sepolia, transport: http(process.env.ENS_RPC_URL) });
+    const block = await client.getBlockNumber();
+    return `Sepolia RPC responded at block ${block.toString()}`;
+  });
+}
+
+if (process.env.BLOCKY402_FACILITATOR_URL === "https://api.testnet.blocky402.com") {
+  await check("blocky402", async () => {
+    const support = await fetchHederaFacilitatorSupport(process.env.BLOCKY402_FACILITATOR_URL!);
+    return `exact x402 v${support.x402Version} Hedera testnet; advertised fee payer ${support.feePayer}`;
+  });
+}
+
+for (const [name, urlKey, keyKey, modelKey] of [
+  ["extraction-model", "EXTRACTION_MODEL_BASE_URL", "EXTRACTION_MODEL_API_KEY", "EXTRACTION_MODEL_ID"]
+] as const) {
+  if (!hasPlaceholder(process.env[urlKey]) && !hasPlaceholder(process.env[keyKey]) && !hasPlaceholder(process.env[modelKey])) {
+    await check(name, async () => {
+      const baseUrl = new URL(process.env[urlKey]!);
+      if (baseUrl.protocol !== "https:" || baseUrl.hostname !== "generativelanguage.googleapis.com") {
+        throw new Error("model endpoint must be the HTTPS Gemini Developer API");
+      }
+      const url = new URL(`${baseUrl.pathname.replace(/\/$/, "")}/models/${encodeURIComponent(process.env[modelKey]!)}`, baseUrl.origin);
+      const response = await fetch(url, {
+        headers: { "x-goog-api-key": process.env[keyKey]! },
+        redirect: "error",
+        signal: AbortSignal.timeout(8_000)
+      });
+      if (!response.ok) throw new Error(`Gemini model metadata returned HTTP ${response.status}`);
+      return `Gemini model metadata responded with HTTP ${response.status}; no inference invoked`;
+    });
+  }
+}
+
+jsonLog({ ok: checks.every(({ ok }) => ok), checks });
+if (checks.some(({ ok }) => !ok)) process.exitCode = 1;

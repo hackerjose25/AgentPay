@@ -1,7 +1,65 @@
-import { paymentTrace } from '@/lib/mockData';
+'use client';
+
+import { useRun } from '@/context/RunContext';
+import { paymentTrace as fallbackTrace } from '@/lib/mockData';
 
 export default function PaymentPage() {
-  const { request, challenge, signature, transaction, verification, unlock } = paymentTrace;
+  const { activeRun, isCompleted } = useRun();
+
+  const request = activeRun
+    ? {
+        method: 'POST',
+        url: activeRun.provider ? `https://${activeRun.provider}/extract` : fallbackTrace.request.url,
+        headers: { 'Content-Type': 'multipart/form-data' },
+        body: { task: 'invoice-extraction', payerAccountId: activeRun.payerAccountId },
+      }
+    : fallbackTrace.request;
+
+  const challenge = activeRun
+    ? {
+        status: 'HTTP/1.1 402 Payment Required',
+        headers: {
+          'X-402-Version': '2.0',
+          'X-402-PayTo': activeRun.recipientAccountId,
+          'X-402-Amount': (Number(activeRun.amountTinybars) / 100_000_000).toFixed(3),
+          'X-402-Currency': 'HBAR',
+          'X-402-Nonce': activeRun.requestId ? `0x${activeRun.requestId.slice(0, 8)}` : '0x8f2d4e19b',
+        },
+      }
+    : fallbackTrace.challenge;
+
+  const signature = activeRun
+    ? {
+        signer: `${activeRun.payerAccountId} (Hedera Wallet)`,
+        message: `x402 payment for ${activeRun.provider || 'ocr.alpha.eth'}`,
+        signedAt: new Date().toISOString(),
+      }
+    : fallbackTrace.signature;
+
+  const transaction = activeRun
+    ? {
+        id: activeRun.transactionReference || fallbackTrace.transaction.id,
+        amount: `${(Number(activeRun.amountTinybars) / 100_000_000).toFixed(3)} HBAR`,
+        from: activeRun.payerAccountId,
+        to: activeRun.recipientAccountId,
+        consensus: activeRun.paymentStatus === 'SETTLED' || isCompleted ? 'SUCCESS' : activeRun.paymentStatus || 'RESERVED',
+        latency: '820ms',
+        explorerUrl: activeRun.transactionReference
+          ? `https://hashscan.io/testnet/transaction/${encodeURIComponent(activeRun.transactionReference)}`
+          : 'https://hashscan.io/testnet',
+      }
+    : fallbackTrace.transaction;
+
+  const verification = {
+    facilitator: 'Blocky402',
+    status: activeRun ? (activeRun.paymentStatus === 'SETTLED' || isCompleted ? 'verified' : 'pending') : fallbackTrace.verification.status,
+    verifiedAt: new Date().toISOString(),
+  };
+
+  const unlock = {
+    status: activeRun ? (isCompleted ? 'service unlocked' : 'waiting execution') : fallbackTrace.unlock.status,
+    unlockedAt: new Date().toISOString(),
+  };
 
   return (
     <div>
@@ -10,7 +68,7 @@ export default function PaymentPage() {
           <h2 className="dash-card-title">
             Payment trace <span className="dash-tag">x402 + HEDERA</span>
           </h2>
-          <span className="dash-badge lime">0.01 HBAR · settled</span>
+          <span className="dash-badge lime">{transaction.amount} · {transaction.consensus}</span>
         </div>
         <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: 1.7, margin: 0 }}>
           Every machine payment leaves a verifiable trail: the agent hits the service, receives an
