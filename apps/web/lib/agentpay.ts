@@ -38,6 +38,7 @@ export interface HederaBrowserWalletAdapter {
   connect(options?: WalletConnectionOptions): Promise<{ accountId: string }>;
   createPaymentSignature(paymentRequired: unknown): Promise<string>;
   disconnect?(): Promise<void>;
+  restore?(): Promise<string | undefined>;
 }
 
 export interface WalletConnectionOptions {

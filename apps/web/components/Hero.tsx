@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
+import Link from 'next/link';
 
 export default function Hero() {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -55,9 +56,9 @@ export default function Hero() {
             <a className="btn default" href="#features">
               <div className="container"><span>Explore Features</span></div>
             </a>
-            <a className="btn solid mask-bt loop" href="/dashboard">
+            <Link className="btn solid mask-bt loop" href="/dashboard">
               <div className="container"><span>Launch Console</span></div>
-            </a>
+            </Link>
             <a className="btn default" href="#architecture">
               <div className="container"><span>Explore Architecture</span></div>
             </a>

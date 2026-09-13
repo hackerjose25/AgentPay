@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { QRCodeSVG } from "qrcode.react";
 import { AgentPayApi, type RoutePreview, type RunView } from "../../lib/agentpay";
+import { getWalletAccountId, subscribeWalletAccount } from "../../lib/wallet-store";
 
 const extractionTask = "Extract the invoice fields";
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000";
@@ -16,8 +16,6 @@ export default function DashboardPage() {
   const [question, setQuestion] = useState("");
   const [invoice, setInvoice] = useState<File | null>(null);
   const [payerAccountId, setPayerAccountId] = useState<string | null>(null);
-  const [pairingUri, setPairingUri] = useState<string | null>(null);
-  const [walletReady, setWalletReady] = useState(false);
   const [preview, setPreview] = useState<RoutePreview | null>(null);
   const [run, setRun] = useState<RunView | null>(null);
   const [busy, setBusy] = useState(false);
@@ -35,18 +33,12 @@ export default function DashboardPage() {
   }, [api]);
 
   useEffect(() => {
-    if (!walletConnectProjectId) return;
-    let active = true;
+    setPayerAccountId(getWalletAccountId());
+    const unsubscribe = subscribeWalletAccount(setPayerAccountId);
     void import("../../lib/hashpack-wallet")
-      .then(({ installHashPackWallet }) => {
-        if (!active) return;
-        installHashPackWallet({ projectId: walletConnectProjectId, origin: window.location.origin });
-        setWalletReady(true);
-      })
-      .catch((error: unknown) => {
-        if (active) setMessage(error instanceof Error ? error.message : "HashPack wallet setup failed.");
-      });
-    return () => { active = false; };
+      .then(({ restoreWalletConnection }) => restoreWalletConnection({ projectId: walletConnectProjectId, origin: window.location.origin }))
+      .catch(() => { /* keep current state */ });
+    return unsubscribe;
   }, []);
 
   async function runAction(action: () => Promise<void>): Promise<void> {
@@ -86,35 +78,13 @@ export default function DashboardPage() {
       idempotencyKey.current = crypto.randomUUID();
       setPreview(nextPreview);
       setRun(null);
-      setMessage("Route ready. Connect a Hedera Testnet wallet to create the payment intent.");
-    });
-  }
-
-  function connectWallet(): void {
-    void runAction(async () => {
-      if (!window.agentPayWallet) throw new Error("HashPack QR is not configured. Add NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID and restart the web app.");
-      setMessage("Scan the QR code with HashPack mobile, then approve the Testnet connection.");
-      try {
-        const wallet = await window.agentPayWallet.connect({ onPairingUri: setPairingUri });
-        setPayerAccountId(wallet.accountId);
-        setMessage(`HashPack connected: ${wallet.accountId}`);
-      } finally {
-        setPairingUri(null);
-      }
-    });
-  }
-
-  function disconnectWallet(): void {
-    void runAction(async () => {
-      await window.agentPayWallet?.disconnect?.();
-      setPayerAccountId(null);
-      setMessage("Wallet disconnected. Session remains active.");
+      setMessage("Route ready. Connect your wallet from the home page header to create the payment intent.");
     });
   }
 
   function createPaymentIntent(): void {
     void runAction(async () => {
-      if (!invoice || !payerAccountId) throw new Error("Connect the payer wallet and choose an invoice first.");
+      if (!invoice || !payerAccountId) throw new Error("Connect your wallet from the home page header, then choose an invoice first.");
       const nextRun = await api.createRun({ task, maxSpendTinybars: budget, payerAccountId, invoice, ...(question.trim() ? { question: question.trim() } : {}) }, idempotencyKey.current);
       setRun(nextRun);
       setMessage("Payment intent reserved. Review the exact terms before signing.");
@@ -123,7 +93,7 @@ export default function DashboardPage() {
 
   function signAndExecute(): void {
     void runAction(async () => {
-      if (!run?.paymentRequired || !window.agentPayWallet) throw new Error("Wallet adapter or payment requirements are unavailable.");
+      if (!run?.paymentRequired || !window.agentPayWallet) throw new Error("Connect your wallet from the home page header before approving a payment.");
       if (new Date(run.expiresAt).getTime() <= Date.now()) throw new Error("This payment intent expired. Cancel it and create a fresh intent.");
       setMessage("Waiting for wallet approval…");
       const signature = await window.agentPayWallet.createPaymentSignature(run.paymentRequired);
@@ -193,27 +163,18 @@ export default function DashboardPage() {
             <span className="dash-dot"></span>
             Hedera Testnet · 296
           </span>
-          {payerAccountId ? (
-            <button className="dash-wallet connected" onClick={disconnectWallet} disabled={busy}>
-              <span className="dash-wallet-addr">{payerAccountId}</span>
-            </button>
-          ) : (
-            <button className="dash-wallet" onClick={connectWallet} disabled={busy || !walletReady}>
-              {walletReady ? "Connect Wallet" : "HashPack setup required"}
-            </button>
+          <span className={`dash-wallet-status${payerAccountId ? " connected" : ""}`} title={payerAccountId ? "Connected via HashPack" : "Connect your wallet from the home page header"}>
+            <span className="dash-dot"></span>
+            {payerAccountId ? payerAccountId : "Wallet not connected"}
+          </span>
+          {authenticated && (
+            <button className="dash-btn-secondary" onClick={logout} disabled={busy}>Log out</button>
           )}
         </div>
       </header>
 
       <div className="dash-page">
         <p className="dash-status" role="status">{message}</p>
-
-        {pairingUri && (
-          <div className="dash-card qr-panel dash" role="dialog" aria-label="Connect HashPack">
-            <QRCodeSVG value={pairingUri} size={180} marginSize={2} title="HashPack WalletConnect pairing code" />
-            <div><strong>Scan with HashPack mobile</strong><p>Open HashPack, choose WalletConnect, and scan this code. Approve Hedera Testnet only.</p></div>
-          </div>
-        )}
 
         {!authenticated ? (
           <section className="dash-card">
@@ -226,18 +187,15 @@ export default function DashboardPage() {
                 <label htmlFor="access-code">Access code</label>
                 <input id="access-code" type="password" value={accessCode} onChange={(event) => setAccessCode(event.target.value)} required />
               </div>
-              <button className="console-run" disabled={busy}>Unlock</button>
+              <button className="console-run" disabled={busy || !payerAccountId}>Unlock</button>
             </form>
+            {!payerAccountId && <p className="dash-hint">Connect your wallet from the home page header to enable sign-in.</p>}
           </section>
         ) : (
           <>
             <section className="dash-card">
               <div className="dash-card-head">
                 <h2 className="dash-card-title">1. Prepare Request</h2>
-                <div className="dash-card-actions">
-                  <span className="dash-badge lime">Session active</span>
-                  <button className="dash-btn-secondary" onClick={logout} disabled={busy}>Log out</button>
-                </div>
               </div>
               <form className="dash-form" onSubmit={previewRoute}>
                 <div className="dash-field">
@@ -274,8 +232,8 @@ export default function DashboardPage() {
                   </table>
                 </div>
                 <div className="dash-card-actions">
-                  <button className="console-run" onClick={connectWallet} disabled={busy || !walletReady}>{payerAccountId ? "HashPack connected" : walletReady ? "Connect HashPack" : "HashPack setup required"}</button>
                   <button className="dash-btn-secondary" onClick={createPaymentIntent} disabled={busy || !payerAccountId}>Create payment intent</button>
+                  {!payerAccountId && <span className="dash-hint">Connect your wallet from the home page header first.</span>}
                 </div>
               </section>
             )}

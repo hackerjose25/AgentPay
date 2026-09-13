@@ -1,6 +1,7 @@
 import type { DAppConnector as DAppConnectorType } from "@hashgraph/hedera-wallet-connect";
 import type { HederaBrowserWalletAdapter, WalletConnectionOptions } from "./agentpay";
 import { createHederaWalletPaymentSignature } from "./hedera-wallet-payment";
+import { setWalletAccountId } from "./wallet-store";
 
 interface HashPackAdapterOptions {
   projectId: string;
@@ -76,7 +77,30 @@ export class HashPackWalletAdapter implements HederaBrowserWalletAdapter {
     }
     if (!signer) throw new Error("HashPack did not provide a Hedera Testnet account.");
     this.accountId = signer.getAccountId().toString();
+    setWalletAccountId(this.accountId);
     return { accountId: this.accountId };
+  }
+
+  getAccountId(): string | undefined {
+    return this.accountId;
+  }
+
+  /**
+   * Restores a previously approved HashPack WalletConnect session (persisted in
+   * localStorage by WalletConnect) after a page reload. Publishes the account to
+   * the shared store when a live session exists, otherwise clears it.
+   */
+  async restore(): Promise<string | undefined> {
+    const connector = await this.connector();
+    const signer = this.hashPackTestnetSigner(connector);
+    if (!signer) {
+      this.accountId = undefined;
+      setWalletAccountId(null);
+      return undefined;
+    }
+    this.accountId = signer.getAccountId().toString();
+    setWalletAccountId(this.accountId);
+    return this.accountId;
   }
 
   async createPaymentSignature(paymentRequired: unknown): Promise<string> {
@@ -85,6 +109,7 @@ export class HashPackWalletAdapter implements HederaBrowserWalletAdapter {
     const signer = this.hashPackTestnetSigner(connector);
     if (!signer || signer.getAccountId().toString() !== this.accountId) {
       this.accountId = undefined;
+      setWalletAccountId(null);
       throw new Error("The HashPack session changed. Reconnect the payer account.");
     }
     return createHederaWalletPaymentSignature(
@@ -101,11 +126,24 @@ export class HashPackWalletAdapter implements HederaBrowserWalletAdapter {
       await connector.disconnectAll();
     }
     this.accountId = undefined;
+    setWalletAccountId(null);
   }
 }
 
 export function installHashPackWallet(options: HashPackAdapterOptions): HederaBrowserWalletAdapter {
+  if (window.agentPayWallet) return window.agentPayWallet;
   const adapter = new HashPackWalletAdapter(options);
   window.agentPayWallet = adapter;
   return adapter;
+}
+
+/**
+ * Ensures the HashPack adapter is installed and restores any previously approved
+ * WalletConnect session. Returns the connected account id, or null when there is
+ * no live session (the store is cleared in that case).
+ */
+export async function restoreWalletConnection(options: HashPackAdapterOptions): Promise<string | null> {
+  const wallet = installHashPackWallet(options);
+  if (typeof wallet.restore !== "function") return null;
+  return (await wallet.restore()) ?? null;
 }

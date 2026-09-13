@@ -1,3 +1,5 @@
+import Link from 'next/link';
+
 export default function Footer() {
   return (
     <footer className="site-footer">
@@ -27,7 +29,7 @@ export default function Footer() {
       <div className="end">
         <div className="copy">AgentPay</div>
         <ul className="links">
-          <li><a href="/dashboard">Console</a></li>
+          <li><Link href="/dashboard">Console</Link></li>
           <li><a href="https://hashscan.io/testnet" target="_blank" rel="noopener noreferrer">HashScan</a></li>
           <li><a href="https://portal.hedera.com/faucet" target="_blank" rel="noopener noreferrer">Faucet</a></li>
           <li><a href="https://x402.org" target="_blank" rel="noopener noreferrer">x402</a></li>
